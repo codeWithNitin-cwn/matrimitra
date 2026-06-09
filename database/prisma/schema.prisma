@@ -309,6 +309,7 @@ model Proposal {
 
   activities        ProposalActivity[]
   pipeline          Pipeline?
+  conversation      Conversation?
 }
 
 model ProposalActivity {
@@ -339,4 +340,53 @@ model Pipeline {
 
   proposal      Proposal @relation(fields: [proposalId], references: [id])
 }
+model Conversation {
+  id         String   @id @default(uuid())
+  proposalId String   @unique
+  createdAt  DateTime @default(now())
 
+  proposal   Proposal @relation(fields: [proposalId], references: [id])
+
+  messages   Message[]
+}
+model Message {
+  id             String   @id @default(uuid())
+  conversationId String
+
+  senderUserId   String
+
+  messageText    String
+  attachmentUrl  String?
+
+  sentAt         DateTime @default(now())
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+}
+model AuditLog {
+  id          String   @id @default(uuid())
+
+  agencyId    String
+  userId      String
+
+  entityType  String
+  entityId    String
+
+  action      String
+  ipAddress   String?
+
+  createdAt   DateTime @default(now())
+}
+model Notification {
+  id               String   @id @default(uuid())
+
+  userId           String
+
+  title            String
+  message          String
+
+  notificationType String
+
+  readFlag         Boolean  @default(false)
+
+  createdAt        DateTime @default(now())
+}
