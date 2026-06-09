@@ -62,6 +62,13 @@ model Agency {
 
   sentProposals      Proposal[] @relation("SenderAgency")
   receivedProposals  Proposal[] @relation("ReceiverAgency")
+
+  partnerships       AgencyPartnership[] @relation("AgencyPartnerships")
+  partnerOf          AgencyPartnership[] @relation("PartnerAgencies")
+
+  profileAccessLogs  ProfileAccessLog[]
+
+
 }
 
 model AgencyUser {
@@ -85,7 +92,10 @@ model AgencyUser {
 
   agency           Agency @relation(fields: [agencyId], references: [id])
 
-  assignedProfiles AgencyProfile[]
+  assignedProfiles  AgencyProfile[]
+
+  followUps         FollowUp[]
+  profileAccessLogs ProfileAccessLog[]
 }
 
 model Person {
@@ -141,11 +151,13 @@ model AgencyProfile {
   photos            ProfilePhoto[]
   documents         ProfileDocument[]
 
-  brideProposals    Proposal[] @relation("BrideProfile")
-  groomProposals    Proposal[] @relation("GroomProfile")
+brideProposals         Proposal[] @relation("BrideProfile")
+groomProposals         Proposal[] @relation("GroomProfile")
 
-  brideCompatibilities AICompatibility[] @relation("BrideCompatibility")
-  groomCompatibilities AICompatibility[] @relation("GroomCompatibility")
+aiBrideCompatibilities AICompatibility[] @relation("BrideCompatibility")
+aiGroomCompatibilities AICompatibility[] @relation("GroomCompatibility")
+
+profileAccessLogs      ProfileAccessLog[]
 }
 
 model ProfilePersonal {
@@ -330,6 +342,8 @@ model Proposal {
   activities        ProposalActivity[]
   pipeline          Pipeline?
   conversation      Conversation?
+
+  followUps         FollowUp[]
 }
 
 model ProposalActivity {
@@ -409,4 +423,52 @@ model Notification {
   readFlag         Boolean  @default(false)
 
   createdAt        DateTime @default(now())
+}
+model AgencyPartnership {
+  id              String   @id @default(uuid())
+
+  agencyId        String
+  partnerAgencyId String
+
+  trustLevel      Int
+  status          String
+
+  createdAt       DateTime @default(now())
+
+  agency          Agency @relation("AgencyPartnerships", fields: [agencyId], references: [id])
+  partnerAgency   Agency @relation("PartnerAgencies", fields: [partnerAgencyId], references: [id])
+
+  @@unique([agencyId, partnerAgencyId])
+}
+
+model ProfileAccessLog {
+  id              String   @id @default(uuid())
+
+  profileId       String
+  viewedByUserId  String
+  agencyId        String
+
+  viewedAt        DateTime @default(now())
+
+  durationSeconds Int?
+
+  profile         AgencyProfile @relation(fields: [profileId], references: [id])
+  viewedByUser    AgencyUser @relation(fields: [viewedByUserId], references: [id])
+  agency          Agency @relation(fields: [agencyId], references: [id])
+}
+
+model FollowUp {
+  id             String   @id @default(uuid())
+
+  proposalId     String
+  assignedUserId String
+
+  dueDate        DateTime
+
+  remarks        String?
+
+  status         String
+
+  proposal       Proposal @relation(fields: [proposalId], references: [id])
+  assignedUser   AgencyUser @relation(fields: [assignedUserId], references: [id])
 }
