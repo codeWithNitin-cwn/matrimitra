@@ -136,6 +136,9 @@ Religion
 Education
 Occupation
 
+AI Generated Summary
+AI Profile Summary (structured text summary optimized for LLM matching)
+
 
 7. Media Vault
 Photos
@@ -185,6 +188,9 @@ Partner Agencies
 
 Entire Network
 
+AI Compatibility Scoring
+Each search card displays an AI Compatibility Score (0-100) and a concise AI Match Explanation highlighting reasons for the match and expectations.
+
 
 10. Match Proposal Workflow
 Step 1
@@ -199,6 +205,9 @@ Actions
 Accept
 Reject
 Request Clarification
+
+AI Compatibility Insights
+Both agencies can view the cached AI Compatibility Score and detailed AI Match Explanation to facilitate review.
 
 
 Step 3

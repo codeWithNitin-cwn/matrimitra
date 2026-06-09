@@ -106,10 +106,10 @@ Agency collaboration
 Audit trail
 Communication
 Reporting
+AI compatibility
 Excluded
 Client self-search
 Public profiles
-AI compatibility
 Premium subscriptions
 Mobile apps
 
@@ -152,12 +152,16 @@ Media
 Photos
 Documents
 Voice introduction
+AI Profile Summary
 
 Module 4 Match Discovery
 Internal Search
 Agency searches its own clients.
 Network Search
 Agency searches ecosystem profiles.
+AI Compatibility
+Heuristic/AI Compatibility Score (0-100) between bride and groom profiles.
+AI Match Explanation detailing matching rationale.
 Filters
 Age
 Religion
@@ -252,7 +256,7 @@ Marriages facilitated
 
 13. Product Roadmap
 Phase 1
-Agency Operating System
+Agency Operating System (including AI Profile Summary, AI Compatibility Scoring, and Match Explanations)
 Phase 2
 Client Portal
 Client login
@@ -260,9 +264,8 @@ Interest management
 Family participation
 Phase 3
 AI Intelligence Layer
-AI onboarding
-Compatibility scoring
-Match explanations
+Automated AI onboarding & matching assistants
+Interactive compatibility simulators
 Phase 4
 Agency Network Marketplace
 Trusted agency discovery

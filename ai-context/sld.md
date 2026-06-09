@@ -93,6 +93,7 @@ Overview
 Personal
 Family
 Preferences
+AI Summary
 Photos
 Documents
 Activity
@@ -163,7 +164,8 @@ Age
 City
 Profession
 Agency
-Compatibility
+AI Compatibility Score (0-100)
+AI Match Explanation Snippet
 
 Actions
 View
@@ -175,6 +177,9 @@ Candidate A
 Summary Card
 Candidate B
 Summary Card
+AI Compatibility Details
+AI Compatibility Score (0-100)
+AI Match Explanation (detailed justification)
 Proposal Form
 Reason
 Notes
@@ -216,6 +221,7 @@ Meeting Scheduled
 Sections
 Candidate A
 Candidate B
+AI Compatibility (Score and Explanation)
 Agency Notes
 History
 

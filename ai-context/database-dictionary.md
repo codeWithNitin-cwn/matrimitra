@@ -167,6 +167,8 @@ onboarding_expiry
 TIMESTAMP
 created_at
 TIMESTAMP
+ai_summary
+TEXT
 
 Status Values
 DRAFT
@@ -400,6 +402,47 @@ stage_date
 TIMESTAMP
 updated_by
 UUID
+
+
+AICompatibility
+Purpose
+Caches AI-calculated compatibility score and detailed explanation between profiles.
+Column
+Type
+Required
+Notes
+id
+UUID
+Yes
+PK
+bride_profile_id
+UUID
+Yes
+FK to AgencyProfile
+groom_profile_id
+UUID
+Yes
+FK to AgencyProfile
+score
+INTEGER
+Yes
+Value 0-100
+explanation
+TEXT
+Yes
+Detailed matching explanation
+created_at
+TIMESTAMP
+Yes
+
+updated_at
+TIMESTAMP
+Yes
+
+
+Indexes
+bride_profile_id, groom_profile_id (Unique)
+score
 
 
 AgencyPartnership

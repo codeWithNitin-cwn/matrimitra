@@ -122,6 +122,7 @@ model AgencyProfile {
 
   onboardingLink    String?
   onboardingExpiry  DateTime?
+  aiSummary         String?       @db.Text
 
   createdAt         DateTime      @default(now())
 
@@ -142,6 +143,9 @@ model AgencyProfile {
 
   brideProposals    Proposal[] @relation("BrideProfile")
   groomProposals    Proposal[] @relation("GroomProfile")
+
+  brideCompatibilities AICompatibility[] @relation("BrideCompatibility")
+  groomCompatibilities AICompatibility[] @relation("GroomCompatibility")
 }
 
 model ProfilePersonal {
@@ -281,6 +285,22 @@ model ProfileDocument {
   uploadedAt       DateTime @default(now())
 
   profile          AgencyProfile @relation(fields: [profileId], references: [id])
+}
+
+model AICompatibility {
+  id              String   @id @default(uuid())
+  brideProfileId  String
+  groomProfileId  String
+  score           Int
+  explanation     String   @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  brideProfile    AgencyProfile @relation("BrideCompatibility", fields: [brideProfileId], references: [id])
+  groomProfile    AgencyProfile @relation("GroomCompatibility", fields: [groomProfileId], references: [id])
+
+  @@unique([brideProfileId, groomProfileId])
+  @@index([score])
 }
 
 model Proposal {
