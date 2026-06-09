@@ -1,63 +1,342 @@
 generator client {
   provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  output   = "../../backend/src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
 }
 
-model Agency {
-  id          String       @id @default(uuid())
-  code        String       @unique
-  name        String
-  email       String       @unique
-  mobile      String
-  city        String?
-  state       String?
-  status      String       @default("ACTIVE")
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+enum AgencyStatus {
+  ACTIVE
+  INACTIVE
+}
 
-  users       AgencyUser[]
-  profiles    AgencyProfile[]
+enum UserRole {
+  OWNER
+  MANAGER
+  EXECUTIVE
+  VIEWER
+}
+
+enum ProfileStatus {
+  DRAFT
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  ARCHIVED
+}
+
+enum DocumentType {
+  ID_PROOF
+  BIODATA
+  EDUCATION
+  INCOME
+  OTHER
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Agency {
+  id             String       @id @default(uuid())
+  agencyCode     String       @unique
+  name           String
+  registrationNo String?
+  email          String       @unique
+  mobile         String
+  website        String?
+  city           String
+  state          String
+  country        String
+  status         AgencyStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  users              AgencyUser[]
+  profiles           AgencyProfile[]
+
+  sentProposals      Proposal[] @relation("SenderAgency")
+  receivedProposals  Proposal[] @relation("ReceiverAgency")
 }
 
 model AgencyUser {
-  id          String    @id @default(uuid())
-  agencyId    String
-  username    String    @unique
-  email       String    @unique
-  passwordHash String
-  role        String
-  status      String    @default("ACTIVE")
-  createdAt   DateTime  @default(now())
+  id               String       @id @default(uuid())
+  agencyId         String
 
-  agency       Agency   @relation(fields: [agencyId], references: [id])
+  firstName        String
+  lastName         String?
+
+  email            String       @unique
+  mobile           String
+
+  username         String       @unique
+  passwordHash     String
+
+  role             UserRole
+  status           AgencyStatus @default(ACTIVE)
+
+  lastLogin        DateTime?
+  createdAt        DateTime     @default(now())
+
+  agency           Agency @relation(fields: [agencyId], references: [id])
+
+  assignedProfiles AgencyProfile[]
 }
 
 model Person {
   id          String    @id @default(uuid())
+
   firstName   String
   lastName    String?
+
   gender      String
+  dob         DateTime?
+
   mobile      String?
   email       String?
+
   createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
 
   profiles    AgencyProfile[]
 }
 
 model AgencyProfile {
-  id          String    @id @default(uuid())
-  agencyId    String
-  personId    String
-  profileCode String    @unique
-  status      String    @default("ACTIVE")
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id                String        @id @default(uuid())
 
-  agency      Agency    @relation(fields: [agencyId], references: [id])
-  person      Person    @relation(fields: [personId], references: [id])
+  agencyId          String
+  personId          String
+  assignedUserId    String?
+
+  profileNumber     String        @unique
+  profileType       String
+
+  status            ProfileStatus @default(DRAFT)
+
+  trustScore        Decimal?      @db.Decimal(5,2)
+  completionPercent Int           @default(0)
+
+  onboardingLink    String?
+  onboardingExpiry  DateTime?
+
+  createdAt         DateTime      @default(now())
+
+  agency            Agency @relation(fields: [agencyId], references: [id])
+  person            Person @relation(fields: [personId], references: [id])
+
+  assignedUser      AgencyUser? @relation(fields: [assignedUserId], references: [id])
+
+  personal          ProfilePersonal?
+
+  educations        ProfileEducation[]
+  careers           ProfileCareer[]
+  families          ProfileFamily[]
+  lifestyles        ProfileLifestyle[]
+  preferences       ProfilePreference[]
+  photos            ProfilePhoto[]
+  documents         ProfileDocument[]
+
+  brideProposals    Proposal[] @relation("BrideProfile")
+  groomProposals    Proposal[] @relation("GroomProfile")
 }
+
+model ProfilePersonal {
+  id             String @id @default(uuid())
+
+  profileId      String @unique
+
+  religion       String?
+  caste          String?
+  subCaste       String?
+  motherTongue   String?
+
+  heightCm       Int?
+  weightKg       Int?
+
+  maritalStatus  String?
+
+  city           String?
+  state          String?
+  country        String?
+
+  profile        AgencyProfile @relation(fields: [profileId], references: [id])
+}
+
+model ProfileEducation {
+  id               String @id @default(uuid())
+
+  profileId        String
+
+  qualification    String
+  specialization   String?
+  institution      String?
+  graduationYear   Int?
+
+  profile          AgencyProfile @relation(fields: [profileId], references: [id])
+}
+
+model ProfileCareer {
+  id             String @id @default(uuid())
+
+  profileId      String
+
+  profession     String?
+  employer       String?
+  designation    String?
+
+  annualIncome   Decimal? @db.Decimal(15,2)
+
+  workLocation   String?
+
+  profile        AgencyProfile @relation(fields: [profileId], references: [id])
+}
+
+model ProfileFamily {
+  id                String @id @default(uuid())
+
+  profileId         String
+
+  fatherName        String?
+  motherName        String?
+
+  fatherOccupation  String?
+  motherOccupation  String?
+
+  familyType        String?
+  familyValues      String?
+
+  siblingsCount     Int?
+
+  profile           AgencyProfile @relation(fields: [profileId], references: [id])
+}
+
+model ProfileLifestyle {
+  id            String @id @default(uuid())
+
+  profileId     String
+
+  foodHabit     String?
+  smoking       Boolean?
+  drinking      Boolean?
+
+  fitnessLevel  String?
+  hobbies       Json?
+
+  profile       AgencyProfile @relation(fields: [profileId], references: [id])
+}
+
+model ProfilePreference {
+  id            String @id @default(uuid())
+
+  profileId     String
+
+  minAge        Int?
+  maxAge        Int?
+
+  minHeight     Int?
+  maxHeight     Int?
+
+  religion      String?
+  caste         String?
+  city          String?
+
+  education     String?
+  profession    String?
+
+  profile       AgencyProfile @relation(fields: [profileId], references: [id])
+}
+
+model ProfilePhoto {
+  id               String @id @default(uuid())
+
+  profileId        String
+
+  cloudinaryUrl    String
+  thumbnailUrl     String?
+
+  isPrimary        Boolean @default(false)
+
+  approvalStatus   ApprovalStatus @default(PENDING)
+
+  uploadedAt       DateTime @default(now())
+
+  profile          AgencyProfile @relation(fields: [profileId], references: [id])
+}
+
+model ProfileDocument {
+  id               String @id @default(uuid())
+
+  profileId        String
+
+  documentType     DocumentType
+
+  fileUrl          String
+
+  approvalStatus   ApprovalStatus @default(PENDING)
+
+  uploadedAt       DateTime @default(now())
+
+  profile          AgencyProfile @relation(fields: [profileId], references: [id])
+}
+
+model Proposal {
+  id                String @id @default(uuid())
+
+  proposalNumber    String @unique
+
+  senderAgencyId    String
+  receiverAgencyId  String
+
+  brideProfileId    String
+  groomProfileId    String
+
+  proposalStatus    String
+  proposalNotes     String?
+
+  createdBy         String
+
+  createdAt         DateTime @default(now())
+
+  senderAgency      Agency @relation("SenderAgency", fields: [senderAgencyId], references: [id])
+  receiverAgency    Agency @relation("ReceiverAgency", fields: [receiverAgencyId], references: [id])
+
+  brideProfile      AgencyProfile @relation("BrideProfile", fields: [brideProfileId], references: [id])
+  groomProfile      AgencyProfile @relation("GroomProfile", fields: [groomProfileId], references: [id])
+
+  activities        ProposalActivity[]
+  pipeline          Pipeline?
+}
+
+model ProposalActivity {
+  id             String @id @default(uuid())
+
+  proposalId     String
+
+  activityType   String
+  activityNotes  String?
+
+  performedBy    String
+
+  createdAt      DateTime @default(now())
+
+  proposal       Proposal @relation(fields: [proposalId], references: [id])
+}
+
+model Pipeline {
+  id            String @id @default(uuid())
+
+  proposalId    String @unique
+
+  currentStage  String
+
+  stageDate     DateTime @default(now())
+
+  updatedBy     String
+
+  proposal      Proposal @relation(fields: [proposalId], references: [id])
+}
+
