@@ -1,4 +1,5 @@
 import express from "express";
+import cors from "cors";
 import { prisma } from "./config/prisma";
 import agencyRoutes from "./modules/agency/agency.routes";
 import { agencyUserRoutes } from "./modules/agency-user/agency-user.routes";
@@ -13,7 +14,12 @@ import { authRoutes } from "./modules/auth/auth.routes";
 import { authenticate } from "./modules/auth/auth.middleware";
 
 const app = express();
-
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 app.use("/api/v1/auth", authRoutes); // Public route
