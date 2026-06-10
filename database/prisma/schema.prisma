@@ -42,6 +42,27 @@ enum ApprovalStatus {
   REJECTED
 }
 
+enum QuestionCategory {
+  PERSONALITY
+  RELATIONSHIP
+  LIFESTYLE
+  FAMILY_VALUES
+  FUN
+}
+
+enum AnswerImportance {
+  MUST_HAVE
+  NICE_TO_HAVE
+  DOESNT_MATTER
+}
+
+enum PreferencePriority {
+  MUST_HAVE
+  IMPORTANT
+  PREFERRED
+  DOESNT_MATTER
+}
+
 model Agency {
   id             String       @id @default(uuid())
   agencyCode     String       @unique
@@ -57,8 +78,8 @@ model Agency {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  users              AgencyUser[]
-  profiles           AgencyProfile[]
+  users    AgencyUser[]
+  profiles AgencyProfile[]
 
   sentProposals      Proposal[] @relation("SenderAgency")
   receivedProposals  Proposal[] @relation("ReceiverAgency")
@@ -67,30 +88,28 @@ model Agency {
   partnerOf          AgencyPartnership[] @relation("PartnerAgencies")
 
   profileAccessLogs  ProfileAccessLog[]
-
-
 }
 
 model AgencyUser {
-  id               String       @id @default(uuid())
-  agencyId         String
+  id       String @id @default(uuid())
+  agencyId String
 
-  firstName        String
-  lastName         String?
+  firstName String
+  lastName  String?
 
-  email            String       @unique
-  mobile           String
+  email  String @unique
+  mobile String
 
-  username         String       @unique
-  passwordHash     String
+  username     String @unique
+  passwordHash String
 
-  role             UserRole
-  status           AgencyStatus @default(ACTIVE)
+  role   UserRole
+  status AgencyStatus @default(ACTIVE)
 
-  lastLogin        DateTime?
-  createdAt        DateTime     @default(now())
+  lastLogin DateTime?
+  createdAt DateTime  @default(now())
 
-  agency           Agency @relation(fields: [agencyId], references: [id])
+  agency Agency @relation(fields: [agencyId], references: [id])
 
   assignedProfiles  AgencyProfile[]
 
@@ -99,204 +118,213 @@ model AgencyUser {
 }
 
 model Person {
-  id          String    @id @default(uuid())
+  id String @id @default(uuid())
 
-  firstName   String
-  lastName    String?
+  firstName String
+  lastName  String?
 
-  gender      String
-  dob         DateTime?
+  gender String
+  dob    DateTime?
 
-  mobile      String?
-  email       String?
+  mobile String?
+  email  String?
 
-  createdAt   DateTime  @default(now())
+  createdAt DateTime @default(now())
 
-  profiles    AgencyProfile[]
+  profiles AgencyProfile[]
 }
 
 model AgencyProfile {
-  id                String        @id @default(uuid())
+  id String @id @default(uuid())
 
-  agencyId          String
-  personId          String
-  assignedUserId    String?
+  agencyId       String
+  personId       String
+  assignedUserId String?
 
-  profileNumber     String        @unique
-  profileType       String
+  profileNumber String @unique
+  profileType   String
 
-  status            ProfileStatus @default(DRAFT)
+  status ProfileStatus @default(DRAFT)
 
-  trustScore        Decimal?      @db.Decimal(5,2)
-  completionPercent Int           @default(0)
+  trustScore        Decimal? @db.Decimal(5, 2)
+  completionPercent Int      @default(0)
 
   onboardingLink    String?
   onboardingExpiry  DateTime?
   aiSummary         String?       @db.Text
 
-  createdAt         DateTime      @default(now())
+  createdAt DateTime @default(now())
 
-  agency            Agency @relation(fields: [agencyId], references: [id])
-  person            Person @relation(fields: [personId], references: [id])
+  agency Agency @relation(fields: [agencyId], references: [id])
+  person Person @relation(fields: [personId], references: [id])
 
-  assignedUser      AgencyUser? @relation(fields: [assignedUserId], references: [id])
+  assignedUser AgencyUser? @relation(fields: [assignedUserId], references: [id])
 
-  personal          ProfilePersonal?
+  personal ProfilePersonal?
 
-  educations        ProfileEducation[]
-  careers           ProfileCareer[]
-  families          ProfileFamily[]
-  lifestyles        ProfileLifestyle[]
-  preferences       ProfilePreference[]
-  photos            ProfilePhoto[]
-  documents         ProfileDocument[]
+  educations  ProfileEducation[]
+  careers     ProfileCareer[]
+  families    ProfileFamily[]
+  lifestyles  ProfileLifestyle[]
+  preferences ProfilePreference[]
+  photos      ProfilePhoto[]
+  documents   ProfileDocument[]
+  answers     ProfileAnswer[]
 
-brideProposals         Proposal[] @relation("BrideProfile")
-groomProposals         Proposal[] @relation("GroomProfile")
+  brideProposals         Proposal[] @relation("BrideProfile")
+  groomProposals         Proposal[] @relation("GroomProfile")
 
-aiBrideCompatibilities AICompatibility[] @relation("BrideCompatibility")
-aiGroomCompatibilities AICompatibility[] @relation("GroomCompatibility")
+  aiBrideCompatibilities AICompatibility[] @relation("BrideCompatibility")
+  aiGroomCompatibilities AICompatibility[] @relation("GroomCompatibility")
 
-profileAccessLogs      ProfileAccessLog[]
+  profileAccessLogs      ProfileAccessLog[]
 }
 
 model ProfilePersonal {
-  id             String @id @default(uuid())
+  id String @id @default(uuid())
 
-  profileId      String @unique
+  profileId String @unique
 
-  religion       String?
-  caste          String?
-  subCaste       String?
-  motherTongue   String?
+  religion     String?
+  caste        String?
+  subCaste     String?
+  motherTongue String?
 
-  heightCm       Int?
-  weightKg       Int?
+  heightCm Int?
+  weightKg Int?
 
-  maritalStatus  String?
+  maritalStatus String?
 
-  city           String?
-  state          String?
-  country        String?
+  city    String?
+  state   String?
+  country String?
 
-  profile        AgencyProfile @relation(fields: [profileId], references: [id])
+  profile AgencyProfile @relation(fields: [profileId], references: [id])
 }
 
 model ProfileEducation {
-  id               String @id @default(uuid())
+  id String @id @default(uuid())
 
-  profileId        String
+  profileId String
 
-  qualification    String
-  specialization   String?
-  institution      String?
-  graduationYear   Int?
+  qualification  String
+  specialization String?
+  institution    String?
+  graduationYear Int?
 
-  profile          AgencyProfile @relation(fields: [profileId], references: [id])
+  profile AgencyProfile @relation(fields: [profileId], references: [id])
 }
 
 model ProfileCareer {
-  id             String @id @default(uuid())
+  id String @id @default(uuid())
 
-  profileId      String
+  profileId String
 
-  profession     String?
-  employer       String?
-  designation    String?
+  profession  String?
+  employer    String?
+  designation String?
 
-  annualIncome   Decimal? @db.Decimal(15,2)
+  annualIncome Decimal? @db.Decimal(15, 2)
 
-  workLocation   String?
+  workLocation String?
 
-  profile        AgencyProfile @relation(fields: [profileId], references: [id])
+  profile AgencyProfile @relation(fields: [profileId], references: [id])
 }
 
 model ProfileFamily {
-  id                String @id @default(uuid())
+  id String @id @default(uuid())
 
-  profileId         String
+  profileId String
 
-  fatherName        String?
-  motherName        String?
+  fatherName String?
+  motherName String?
 
-  fatherOccupation  String?
-  motherOccupation  String?
+  fatherOccupation String?
+  motherOccupation String?
 
-  familyType        String?
-  familyValues      String?
+  familyType   String?
+  familyValues String?
 
-  siblingsCount     Int?
+  siblingsCount Int?
 
-  profile           AgencyProfile @relation(fields: [profileId], references: [id])
+  profile AgencyProfile @relation(fields: [profileId], references: [id])
 }
 
 model ProfileLifestyle {
-  id            String @id @default(uuid())
+  id String @id @default(uuid())
 
-  profileId     String
+  profileId String
 
-  foodHabit     String?
-  smoking       Boolean?
-  drinking      Boolean?
+  foodHabit String?
+  smoking   Boolean?
+  drinking  Boolean?
 
-  fitnessLevel  String?
-  hobbies       Json?
+  fitnessLevel String?
+  hobbies      Json?
 
-  profile       AgencyProfile @relation(fields: [profileId], references: [id])
+  profile AgencyProfile @relation(fields: [profileId], references: [id])
 }
 
 model ProfilePreference {
-  id            String @id @default(uuid())
+  id String @id @default(uuid())
 
-  profileId     String
+  profileId String
 
-  minAge        Int?
-  maxAge        Int?
+  minAge Int?
+  maxAge Int?
 
-  minHeight     Int?
-  maxHeight     Int?
+  minHeight Int?
+  maxHeight Int?
 
-  religion      String?
-  caste         String?
-  city          String?
+  religion String?
+  caste    String?
+  city     String?
 
-  education     String?
-  profession    String?
+  education  String?
+  profession String?
 
-  profile       AgencyProfile @relation(fields: [profileId], references: [id])
+  agePriority        PreferencePriority @default(DOESNT_MATTER)
+  heightPriority     PreferencePriority @default(DOESNT_MATTER)
+  religionPriority   PreferencePriority @default(DOESNT_MATTER)
+  castePriority      PreferencePriority @default(DOESNT_MATTER)
+  cityPriority       PreferencePriority @default(DOESNT_MATTER)
+  educationPriority  PreferencePriority @default(DOESNT_MATTER)
+  professionPriority PreferencePriority @default(DOESNT_MATTER)
+
+  profile AgencyProfile @relation(fields: [profileId], references: [id])
 }
 
 model ProfilePhoto {
-  id               String @id @default(uuid())
+  id String @id @default(uuid())
 
-  profileId        String
+  profileId String
 
-  cloudinaryUrl    String
-  thumbnailUrl     String?
+  cloudinaryUrl String
+  thumbnailUrl  String?
 
-  isPrimary        Boolean @default(false)
+  isPrimary Boolean @default(false)
 
-  approvalStatus   ApprovalStatus @default(PENDING)
+  approvalStatus ApprovalStatus @default(PENDING)
 
-  uploadedAt       DateTime @default(now())
+  uploadedAt DateTime @default(now())
 
-  profile          AgencyProfile @relation(fields: [profileId], references: [id])
+  profile AgencyProfile @relation(fields: [profileId], references: [id])
 }
 
 model ProfileDocument {
-  id               String @id @default(uuid())
+  id String @id @default(uuid())
 
-  profileId        String
+  profileId String
 
-  documentType     DocumentType
+  documentType DocumentType
 
-  fileUrl          String
+  fileUrl String
 
-  approvalStatus   ApprovalStatus @default(PENDING)
+  approvalStatus ApprovalStatus @default(PENDING)
 
-  uploadedAt       DateTime @default(now())
+  uploadedAt DateTime @default(now())
 
-  profile          AgencyProfile @relation(fields: [profileId], references: [id])
+  profile AgencyProfile @relation(fields: [profileId], references: [id])
 }
 
 model AICompatibility {
@@ -316,28 +344,28 @@ model AICompatibility {
 }
 
 model Proposal {
-  id                String @id @default(uuid())
+  id String @id @default(uuid())
 
-  proposalNumber    String @unique
+  proposalNumber String @unique
 
-  senderAgencyId    String
-  receiverAgencyId  String
+  senderAgencyId   String
+  receiverAgencyId String
 
-  brideProfileId    String
-  groomProfileId    String
+  brideProfileId String
+  groomProfileId String
 
-  proposalStatus    String
-  proposalNotes     String?
+  proposalStatus String
+  proposalNotes  String?
 
-  createdBy         String
+  createdBy String
 
-  createdAt         DateTime @default(now())
+  createdAt DateTime @default(now())
 
-  senderAgency      Agency @relation("SenderAgency", fields: [senderAgencyId], references: [id])
-  receiverAgency    Agency @relation("ReceiverAgency", fields: [receiverAgencyId], references: [id])
+  senderAgency   Agency @relation("SenderAgency", fields: [senderAgencyId], references: [id])
+  receiverAgency Agency @relation("ReceiverAgency", fields: [receiverAgencyId], references: [id])
 
-  brideProfile      AgencyProfile @relation("BrideProfile", fields: [brideProfileId], references: [id])
-  groomProfile      AgencyProfile @relation("GroomProfile", fields: [groomProfileId], references: [id])
+  brideProfile AgencyProfile @relation("BrideProfile", fields: [brideProfileId], references: [id])
+  groomProfile AgencyProfile @relation("GroomProfile", fields: [groomProfileId], references: [id])
 
   activities        ProposalActivity[]
   pipeline          Pipeline?
@@ -347,82 +375,122 @@ model Proposal {
 }
 
 model ProposalActivity {
-  id             String @id @default(uuid())
+  id String @id @default(uuid())
 
-  proposalId     String
+  proposalId String
 
-  activityType   String
-  activityNotes  String?
+  activityType  String
+  activityNotes String?
 
-  performedBy    String
+  performedBy String
 
-  createdAt      DateTime @default(now())
+  createdAt DateTime @default(now())
 
-  proposal       Proposal @relation(fields: [proposalId], references: [id])
+  proposal Proposal @relation(fields: [proposalId], references: [id])
 }
 
 model Pipeline {
-  id            String @id @default(uuid())
+  id String @id @default(uuid())
 
-  proposalId    String @unique
+  proposalId String @unique
 
-  currentStage  String
+  currentStage String
 
-  stageDate     DateTime @default(now())
+  stageDate DateTime @default(now())
 
-  updatedBy     String
+  updatedBy String
 
-  proposal      Proposal @relation(fields: [proposalId], references: [id])
+  proposal Proposal @relation(fields: [proposalId], references: [id])
 }
+
 model Conversation {
   id         String   @id @default(uuid())
   proposalId String   @unique
   createdAt  DateTime @default(now())
 
-  proposal   Proposal @relation(fields: [proposalId], references: [id])
+  proposal Proposal @relation(fields: [proposalId], references: [id])
 
-  messages   Message[]
+  messages Message[]
 }
+
 model Message {
-  id             String   @id @default(uuid())
+  id             String @id @default(uuid())
   conversationId String
 
-  senderUserId   String
+  senderUserId String
 
-  messageText    String
-  attachmentUrl  String?
+  messageText   String
+  attachmentUrl String?
 
-  sentAt         DateTime @default(now())
+  sentAt DateTime @default(now())
 
-  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  conversation Conversation @relation(fields: [conversationId], references: [id])
 }
+
 model AuditLog {
-  id          String   @id @default(uuid())
+  id String @id @default(uuid())
 
-  agencyId    String
-  userId      String
+  agencyId String
+  userId   String
 
-  entityType  String
-  entityId    String
+  entityType String
+  entityId   String
 
-  action      String
-  ipAddress   String?
+  action    String
+  ipAddress String?
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 }
+
 model Notification {
-  id               String   @id @default(uuid())
+  id String @id @default(uuid())
 
-  userId           String
+  userId String
 
-  title            String
-  message          String
+  title   String
+  message String
 
   notificationType String
 
-  readFlag         Boolean  @default(false)
+  readFlag Boolean @default(false)
 
-  createdAt        DateTime @default(now())
+  createdAt DateTime @default(now())
+}
+
+model Question {
+  id           String           @id @default(uuid())
+  questionText String
+  category     QuestionCategory
+  isActive     Boolean          @default(true)
+  createdAt    DateTime         @default(now())
+
+  options QuestionOption[]
+  answers ProfileAnswer[]
+}
+
+model QuestionOption {
+  id         String @id @default(uuid())
+  questionId String
+  optionText String
+
+  question Question        @relation(fields: [questionId], references: [id])
+  answers  ProfileAnswer[]
+}
+
+model ProfileAnswer {
+  id               String           @id @default(uuid())
+  profileId        String
+  questionId       String
+  selectedOptionId String
+  importance       AnswerImportance
+  createdAt        DateTime         @default(now())
+
+  profile        AgencyProfile  @relation(fields: [profileId], references: [id])
+  question       Question       @relation(fields: [questionId], references: [id])
+  selectedOption QuestionOption @relation(fields: [selectedOptionId], references: [id])
+
+  // Ensures a profile can only answer a specific question once
+  @@unique([profileId, questionId])
 }
 model AgencyPartnership {
   id              String   @id @default(uuid())
