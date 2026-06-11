@@ -76,9 +76,13 @@ function ProfilesList() {
 >
   <EyeIcon className="h-5 w-5" />
 </Link>
-            <button className="text-gray-400 hover:text-indigo-600" aria-label="Edit profile">
-              <PencilSquareIcon className="h-5 w-5" />
-            </button>
+            <Link
+  href={`/dashboard/profiles/${profile.id}/edit`}
+  className="text-gray-400 hover:text-indigo-600"
+  aria-label="Edit profile"
+>
+  <PencilSquareIcon className="h-5 w-5" />
+</Link>
             <button className="text-gray-400 hover:text-red-600" aria-label="Delete profile">
               <TrashIcon className="h-5 w-5" />
             </button>
