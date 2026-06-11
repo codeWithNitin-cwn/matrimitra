@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { PlusIcon, EyeIcon, PencilSquareIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { useQuery, QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ProfileService } from "../../../services/profile.service";
+import { ProfileService } from "@/services/profile.service";
 
 const queryClient = new QueryClient();
 

@@ -1,13 +1,17 @@
 import { Request, Response } from "express";
 import { ProfileService } from "./profile.service";
-import { createProfileSchema, createProfilePersonalSchema, createProfileEducationSchema, createProfileCareerSchema, createProfileFamilySchema, createProfileLifestyleSchema, createProfilePreferenceSchema, createProfileAnswerSchema } from "./profile.validator";
-
-const profileService = new ProfileService();
+import { createDraftProfileSchema, createProfileSchema, createProfilePersonalSchema, createProfileEducationSchema, createProfileCareerSchema, createProfileFamilySchema, createProfileLifestyleSchema, createProfilePreferenceSchema, createProfileAnswerSchema } from "./profile.validator";
 
 export class ProfileController {
+  private profileService: ProfileService;
+
+  constructor() {
+    this.profileService = new ProfileService();
+  }
+
   async getProfiles(req: Request, res: Response): Promise<void> {
     try {
-      const profiles = await profileService.getProfiles();
+      const profiles = await this.profileService.getProfiles();
       res.status(200).json({ success: true, data: profiles });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to fetch profiles";
@@ -36,12 +40,46 @@ export class ProfileController {
         return;
       }
 
-      const profile = await profileService.createProfile(validationResult.data);
+      const profile = await this.profileService.createProfile(validationResult.data);
 
       res.status(201).json({ success: true, data: profile });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to create profile";
       res.status(409).json({
+        success: false,
+        error: {
+          code: "BUSINESS_RULE_ERROR",
+          message
+        }
+      });
+    }
+  }
+
+  async createDraft(req: Request, res: Response): Promise<void> {
+    try {
+      const validationResult = createDraftProfileSchema.safeParse(req.body);
+
+      if (!validationResult.success) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
+          }
+        });
+        return;
+      }
+
+      // Assuming agencyId and user ID are populated by your auth middleware
+      const agencyId = (req as any).user?.agencyId;
+      const assignedUserId = (req as any).user?.id;
+
+      const draft = await this.profileService.createDraft(agencyId, assignedUserId, validationResult.data);
+
+      res.status(201).json({ success: true, data: draft });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to create draft profile";
+      res.status(400).json({
         success: false,
         error: {
           code: "BUSINESS_RULE_ERROR",
@@ -68,7 +106,7 @@ export class ProfileController {
         return;
       }
 
-      const profilePersonal = await profileService.createProfilePersonal(profileId, validationResult.data);
+      const profilePersonal = await this.profileService.createProfilePersonal(profileId, validationResult.data);
 
       res.status(201).json({ success: true, data: profilePersonal });
     } catch (error: unknown) {
@@ -100,7 +138,7 @@ export class ProfileController {
         return;
       }
 
-      const profileEducation = await profileService.createProfileEducation(profileId, validationResult.data);
+      const profileEducation = await this.profileService.createProfileEducation(profileId, validationResult.data);
 
       res.status(201).json({ success: true, data: profileEducation });
     } catch (error: unknown) {
@@ -132,7 +170,7 @@ export class ProfileController {
         return;
       }
 
-      const profileCareer = await profileService.createProfileCareer(profileId, validationResult.data);
+      const profileCareer = await this.profileService.createProfileCareer(profileId, validationResult.data);
 
       res.status(201).json({ success: true, data: profileCareer });
     } catch (error: unknown) {
@@ -164,7 +202,7 @@ export class ProfileController {
         return;
       }
 
-      const profileFamily = await profileService.createProfileFamily(profileId, validationResult.data);
+      const profileFamily = await this.profileService.createProfileFamily(profileId, validationResult.data);
 
       res.status(201).json({ success: true, data: profileFamily });
     } catch (error: unknown) {
@@ -196,7 +234,7 @@ export class ProfileController {
         return;
       }
 
-      const profileLifestyle = await profileService.createProfileLifestyle(profileId, validationResult.data);
+      const profileLifestyle = await this.profileService.createProfileLifestyle(profileId, validationResult.data);
 
       res.status(201).json({ success: true, data: profileLifestyle });
     } catch (error: unknown) {
@@ -228,7 +266,7 @@ export class ProfileController {
         return;
       }
 
-      const profilePreference = await profileService.createProfilePreference(profileId, validationResult.data);
+      const profilePreference = await this.profileService.createProfilePreference(profileId, validationResult.data);
 
       res.status(201).json({ success: true, data: profilePreference });
     } catch (error: unknown) {
@@ -260,7 +298,7 @@ export class ProfileController {
         return;
       }
 
-      const profileAnswer = await profileService.createProfileAnswer(profileId, validationResult.data);
+      const profileAnswer = await this.profileService.createProfileAnswer(profileId, validationResult.data);
 
       res.status(201).json({ success: true, data: profileAnswer });
     } catch (error: unknown) {
@@ -277,7 +315,7 @@ export class ProfileController {
 
   async getProfileAnswers(req: Request, res: Response): Promise<void> {
     try {
-      const answers = await profileService.getProfileAnswers(req.params.profileId);
+      const answers = await this.profileService.getProfileAnswers(req.params.profileId);
       res.status(200).json({ success: true, data: answers });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to fetch answers";

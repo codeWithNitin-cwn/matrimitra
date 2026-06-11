@@ -2,6 +2,108 @@ import { prisma } from "../../config/prisma";
 import { Prisma } from "../../generated/prisma/client";
 
 export class ProfileRepository {
+  async createDraftTransaction(agencyId: string, assignedUserId: string | undefined, profileNumber: string, profileType: string, data: any) {
+    return prisma.$transaction(async (tx) => {
+      // 1. Split name to satisfy Person constraints
+      const nameParts = data.name ? data.name.trim().split(' ') : ['Draft'];
+      const firstName = nameParts[0];
+      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : null;
+
+      // 2. Safely parse numeric fields
+      const heightCm = data.height ? parseInt(data.height, 10) : undefined;
+      const salary = data.salary ? parseFloat(data.salary) : undefined;
+      const minAge = data.ageRange ? parseInt(data.ageRange.split('-')[0], 10) : undefined;
+      const maxAge = data.ageRange ? parseInt(data.ageRange.split('-')[1], 10) : undefined;
+
+      // Convert manual age input into an approximate DOB if exact DOB is missing
+      let resolvedDob = data.dob ? new Date(data.dob) : null;
+      if (!resolvedDob && data.age) {
+        const approxYear = new Date().getFullYear() - parseInt(data.age, 10);
+        resolvedDob = new Date(`${approxYear}-01-01`);
+      }
+
+      // 3. Create Person
+      const person = await tx.person.create({
+        data: {
+          firstName,
+          lastName,
+          gender: data.gender || 'UNKNOWN',
+          dob: resolvedDob,
+          mobile: data.mobile || null,
+          email: data.email || null,
+        }
+      });
+
+      // 4. Build strictly typed nested writes
+      const personalCreate = (data.religion || data.caste || data.motherTongue || data.maritalStatus || data.city || !isNaN(heightCm as number)) ? {
+        create: {
+          religion: data.religion,
+          caste: data.caste,
+          motherTongue: data.motherTongue,
+          maritalStatus: data.maritalStatus,
+          city: data.city,
+          heightCm: !isNaN(heightCm as number) ? heightCm : undefined,
+        }
+      } : undefined;
+
+      const educationsCreate = (data.degree || data.college) ? {
+        create: [{
+          qualification: data.degree || 'Draft', // required field
+          institution: data.college,
+        }]
+      } : undefined;
+
+      const careersCreate = (data.occupation || data.company || data.salary) ? {
+        create: [{
+          profession: data.occupation,
+          employer: data.company,
+          annualIncome: !isNaN(salary as number) ? salary : undefined,
+        }]
+      } : undefined;
+
+      const familiesCreate = (data.father || data.mother || data.siblings) ? {
+        create: [{
+          fatherName: data.father,
+          motherName: data.mother,
+          familyType: data.siblings, // Using string field to store textarea draft
+        }]
+      } : undefined;
+
+      const preferencesCreate = (data.ageRange || data.educationPreference) ? {
+        create: [{
+          minAge: !isNaN(minAge as number) ? minAge : undefined,
+          maxAge: !isNaN(maxAge as number) ? maxAge : undefined,
+          education: data.educationPreference,
+        }]
+      } : undefined;
+
+      // 5. Create base Profile and sub-records simultaneously
+      return tx.agencyProfile.create({
+        data: {
+          agencyId,
+          personId: person.id,
+          assignedUserId: assignedUserId || null,
+          profileNumber,
+          profileType,
+          status: 'DRAFT',
+          ...(personalCreate && { personal: personalCreate }),
+          ...(educationsCreate && { educations: educationsCreate }),
+          ...(careersCreate && { careers: careersCreate }),
+          ...(familiesCreate && { families: familiesCreate }),
+          ...(preferencesCreate && { preferences: preferencesCreate }),
+        },
+        include: {
+          person: true,
+          personal: true,
+          educations: true,
+          careers: true,
+          families: true,
+          preferences: true,
+        }
+      });
+    });
+  }
+
   async findByProfileNumber(profileNumber: string) {
     return prisma.agencyProfile.findUnique({ where: { profileNumber } });
   }

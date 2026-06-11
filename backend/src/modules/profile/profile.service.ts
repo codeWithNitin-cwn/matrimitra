@@ -8,6 +8,23 @@ export class ProfileService {
     this.repository = new ProfileRepository();
   }
 
+  async createDraft(agencyId: string, assignedUserId: string | undefined, data: any) {
+    const profileNumber = `PR-${Date.now()}`;
+    
+    let profileType = 'OTHER';
+    if (data.gender) {
+      profileType = data.gender.toUpperCase() === 'FEMALE' ? 'BRIDE' : 'GROOM';
+    }
+
+    return this.repository.createDraftTransaction(
+      agencyId,
+      assignedUserId,
+      profileNumber,
+      profileType,
+      data
+    );
+  }
+
   async getProfiles() {
     return this.repository.findAllProfiles();
   }

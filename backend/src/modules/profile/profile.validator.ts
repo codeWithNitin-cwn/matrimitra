@@ -1,5 +1,31 @@
 import { z } from "zod";
 
+export const createDraftProfileSchema = z.object({
+  name: z.string().optional(),
+  gender: z.string().optional(),
+  dob: z.string().optional(),
+  age: z.string().or(z.number()).optional(),
+  height: z.string().optional(),
+  religion: z.string().optional(),
+  caste: z.string().optional(),
+  motherTongue: z.string().optional(),
+  maritalStatus: z.string().optional(),
+  city: z.string().optional(),
+  mobile: z.string().optional(),
+  email: z.string().email().optional().or(z.literal("")),
+  degree: z.string().optional(),
+  college: z.string().optional(),
+  occupation: z.string().optional(),
+  company: z.string().optional(),
+  salary: z.string().optional(),
+  father: z.string().optional(),
+  mother: z.string().optional(),
+  siblings: z.string().optional(),
+  ageRange: z.string().optional(),
+  heightRange: z.string().optional(),
+  educationPreference: z.string().optional(),
+});
+
 export const createProfileSchema = z.object({
   agencyId: z.string().uuid("Invalid Agency ID format").or(z.string().min(1, "Agency ID is required")),
   personId: z.string().uuid("Invalid Person ID format").or(z.string().min(1, "Person ID is required")),

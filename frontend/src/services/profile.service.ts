@@ -34,4 +34,9 @@ export const ProfileService = {
       };
     });
   },
+
+  async createDraft(data: any) {
+    const response = await api.post('/profiles/draft', data);
+    return response.data;
+  },
 };
