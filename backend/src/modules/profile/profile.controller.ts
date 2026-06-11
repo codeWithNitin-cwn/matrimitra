@@ -25,6 +25,23 @@ export class ProfileController {
     }
   }
 
+  async getProfileById(req: Request, res: Response): Promise<void> {
+    try {
+      const { profileId } = req.params;
+      const profile = await this.profileService.getProfileById(profileId);
+      res.status(200).json({ success: true, data: profile });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to fetch profile";
+      res.status(404).json({
+        success: false,
+        error: {
+          code: "NOT_FOUND",
+          message
+        }
+      });
+    }
+  }
+
   async createProfile(req: Request, res: Response): Promise<void> {
     try {
       const validationResult = createProfileSchema.safeParse(req.body);

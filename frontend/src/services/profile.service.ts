@@ -35,6 +35,11 @@ export const ProfileService = {
     });
   },
 
+  async getProfileById(id: string) {
+    const response = await api.get(`/profiles/${id}`);
+    return response.data?.data;
+  },
+
   async createDraft(data: any) {
     const response = await api.post('/profiles/draft', data);
     return response.data;

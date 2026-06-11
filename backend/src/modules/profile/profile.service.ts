@@ -25,6 +25,14 @@ export class ProfileService {
     );
   }
 
+  async getProfileById(id: string) {
+    const profile = await this.repository.findFullProfileById(id);
+    if (!profile) {
+      throw new Error("Profile not found");
+    }
+    return profile;
+  }
+
   async getProfiles() {
     return this.repository.findAllProfiles();
   }
