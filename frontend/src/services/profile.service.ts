@@ -44,4 +44,8 @@ export const ProfileService = {
     const response = await api.post('/profiles/draft', data);
     return response.data;
   },
+  async updateDraft(id: string, data: any) {
+  const response = await api.put(`/profiles/${id}`, data);
+  return response.data;
+},
 };

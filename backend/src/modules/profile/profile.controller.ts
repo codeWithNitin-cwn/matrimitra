@@ -106,6 +106,33 @@ export class ProfileController {
     }
   }
 
+  async updateDraft(req: Request, res: Response): Promise<void> {
+    try {
+      const { profileId } = req.params;
+      const validationResult = createDraftProfileSchema.safeParse(req.body);
+
+      if (!validationResult.success) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: "VALIDATION_ERROR",
+            message: validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
+          }
+        });
+        return;
+      }
+
+      const draft = await this.profileService.updateDraft(profileId, validationResult.data);
+      res.status(200).json({ success: true, data: draft });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to update draft profile";
+      res.status(400).json({
+        success: false,
+        error: { code: "BUSINESS_RULE_ERROR", message }
+      });
+    }
+  }
+
   async createProfilePersonal(req: Request, res: Response): Promise<void> {
     try {
       const { profileId } = req.params;

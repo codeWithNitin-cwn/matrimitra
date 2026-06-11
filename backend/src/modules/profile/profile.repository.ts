@@ -103,6 +103,132 @@ export class ProfileRepository {
       });
     });
   }
+  
+  async updateDraftTransaction(profileId: string, data: any) {
+    return prisma.$transaction(async (tx) => {
+      const existingProfile = await tx.agencyProfile.findUnique({
+        where: { id: profileId },
+        include: { person: true }
+      });
+      
+      if (!existingProfile) {
+        throw new Error("Profile not found");
+      }
+
+      // 1. Split name to satisfy Person constraints
+      const nameParts = data.name ? data.name.trim().split(' ') : ['Draft'];
+      const firstName = nameParts[0];
+      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : null;
+
+      // 2. Safely parse numeric fields
+      const heightCm = data.height ? parseInt(data.height, 10) : undefined;
+      const salary = data.salary ? parseFloat(data.salary) : undefined;
+      const minAge = data.ageRange ? parseInt(data.ageRange.split('-')[0], 10) : undefined;
+      const maxAge = data.ageRange ? parseInt(data.ageRange.split('-')[1], 10) : undefined;
+
+      // Convert manual age input into an approximate DOB if exact DOB is missing
+      let resolvedDob = data.dob ? new Date(data.dob) : null;
+      if (!resolvedDob && data.age) {
+        const approxYear = new Date().getFullYear() - parseInt(data.age, 10);
+        resolvedDob = new Date(`${approxYear}-01-01`);
+      }
+
+      // 3. Update Person
+      await tx.person.update({
+        where: { id: existingProfile.personId },
+        data: {
+          firstName,
+          lastName,
+          gender: data.gender || 'UNKNOWN',
+          dob: resolvedDob,
+          mobile: data.mobile || null,
+          email: data.email || null,
+        }
+      });
+
+      // 4. Build strictly typed nested writes
+      // 4. Build strictly typed nested writes for upserts and replacements
+      const personalData = {
+        religion: data.religion,
+        caste: data.caste,
+        motherTongue: data.motherTongue,
+        maritalStatus: data.maritalStatus,
+        city: data.city,
+        heightCm: !isNaN(heightCm as number) ? heightCm : undefined,
+      };
+
+      const personalUpdate = (data.religion || data.caste || data.motherTongue || data.maritalStatus || data.city || !isNaN(heightCm as number)) ? {
+        upsert: {
+          create: personalData,
+          update: personalData
+        }
+      } : undefined;
+
+      const educationsUpdate = {
+        deleteMany: {},
+        ...(data.degree || data.college ? {
+          create: [{
+            qualification: data.degree || 'Draft',
+            institution: data.college,
+          }]
+        } : {})
+      };
+
+      const careersUpdate = {
+        deleteMany: {},
+        ...(data.occupation || data.company || data.salary ? {
+          create: [{
+            profession: data.occupation,
+            employer: data.company,
+            annualIncome: !isNaN(salary as number) ? salary : undefined,
+          }]
+        } : {})
+      };
+
+      const familiesUpdate = {
+        deleteMany: {},
+        ...(data.father || data.mother || data.siblings ? {
+          create: [{
+            fatherName: data.father,
+            motherName: data.mother,
+            familyType: data.siblings,
+          }]
+        } : {})
+      };
+
+      const preferencesUpdate = {
+        deleteMany: {},
+        ...(data.ageRange || data.educationPreference ? {
+          create: [{
+            minAge: !isNaN(minAge as number) ? minAge : undefined,
+            maxAge: !isNaN(maxAge as number) ? maxAge : undefined,
+            education: data.educationPreference,
+          }]
+        } : {})
+      };
+
+      // 5. Update base Profile and sub-records simultaneously
+      // 5. Update base Profile and completely replace sub-records simultaneously
+      return tx.agencyProfile.update({
+        where: { id: profileId },
+        data: {
+          ...(personalUpdate && { personal: personalUpdate }),
+          educations: educationsUpdate,
+          careers: careersUpdate,
+          families: familiesUpdate,
+          preferences: preferencesUpdate,
+        },
+        include: {
+          person: true,
+          personal: true,
+          educations: true,
+          careers: true,
+          families: true,
+          preferences: true,
+        }
+      });
+    });
+  }
 
   async findByProfileNumber(profileNumber: string) {
     return prisma.agencyProfile.findUnique({ where: { profileNumber } });

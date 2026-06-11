@@ -178,7 +178,9 @@ export class ProfileService {
       importance: data.importance as any, // Cast enum to align Zod with Prisma types
     });
   }
-
+    async updateDraft(profileId: string, data: any) {
+    return this.repository.updateDraftTransaction(profileId, data);
+  }
   async getProfileAnswers(profileId: string) {
     const profile = await this.repository.findProfileById(profileId);
     if (!profile) {
