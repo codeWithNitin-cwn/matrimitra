@@ -26,6 +26,15 @@ export class ProfileRepository {
     return prisma.agencyProfile.findUnique({ where: { id } });
   }
 
+  async findAllProfiles() {
+  return prisma.agencyProfile.findMany({
+    include: {
+      person: true,
+      personal: true,
+    },
+  });
+}
+
   async findProfilePersonalByProfileId(profileId: string) {
     return prisma.profilePersonal.findUnique({ where: { profileId } });
   }

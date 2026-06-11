@@ -4,6 +4,7 @@ import { ProfileController } from "./profile.controller";
 const router = Router();
 const profileController = new ProfileController();
 
+router.get("/", (req, res) => profileController.getProfiles(req, res));
 router.post("/", (req, res) => profileController.createProfile(req, res));
 router.post("/:profileId/personal", (req, res) => profileController.createProfilePersonal(req, res));
 router.post("/:profileId/education", (req, res) => profileController.createProfileEducation(req, res));

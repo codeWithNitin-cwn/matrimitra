@@ -8,6 +8,10 @@ export class ProfileService {
     this.repository = new ProfileRepository();
   }
 
+  async getProfiles() {
+    return this.repository.findAllProfiles();
+  }
+
   async createProfile(data: CreateProfileDTO) {
     const existingProfile = await this.repository.findByProfileNumber(data.profileNumber);
     if (existingProfile) {

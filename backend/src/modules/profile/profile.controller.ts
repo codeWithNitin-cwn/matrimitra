@@ -5,6 +5,22 @@ import { createProfileSchema, createProfilePersonalSchema, createProfileEducatio
 const profileService = new ProfileService();
 
 export class ProfileController {
+  async getProfiles(req: Request, res: Response): Promise<void> {
+    try {
+      const profiles = await profileService.getProfiles();
+      res.status(200).json({ success: true, data: profiles });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to fetch profiles";
+      res.status(500).json({
+        success: false,
+        error: {
+          code: "INTERNAL_SERVER_ERROR",
+          message
+        }
+      });
+    }
+  }
+
   async createProfile(req: Request, res: Response): Promise<void> {
     try {
       const validationResult = createProfileSchema.safeParse(req.body);
