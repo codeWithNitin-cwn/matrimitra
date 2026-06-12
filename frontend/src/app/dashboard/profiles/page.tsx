@@ -1,6 +1,6 @@
 'use client';
 
-import React from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { PlusIcon, EyeIcon, PencilSquareIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { useQuery, QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -14,6 +14,23 @@ function ProfilesList() {
     queryFn: ProfileService.getProfiles,
   });
 
+  const [searchTerm, setSearchTerm] = useState("");
+  const [genderFilter, setGenderFilter] = useState("");
+
+  const filteredProfiles = useMemo(() => {
+    if (!profiles) return [];
+    return profiles.filter((profile: any) => {
+      const searchLower = searchTerm.toLowerCase();
+      const fullName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim().toLowerCase();
+      const profileId = (profile.profileNumber || profile.id || '').toLowerCase();
+      
+      const matchesSearch = profileId.includes(searchLower) || fullName.includes(searchLower);
+      const matchesGender = genderFilter ? profile.gender === genderFilter : true;
+      
+      return matchesSearch && matchesGender;
+    });
+  }, [profiles, searchTerm, genderFilter]);
+
   return (
     <div className="container mx-auto">
       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-6">
@@ -25,6 +42,28 @@ function ProfilesList() {
           <PlusIcon className="-ml-0.5 h-5 w-5" aria-hidden="true" />
           Create Profile
         </Link>
+      </div>
+
+      {/* Filters Section */}
+      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+        <input
+          type="text"
+          placeholder="Search by ID or Name..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="border border-gray-300 rounded-md px-4 py-2 text-sm w-full sm:w-80 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
+        />
+        <select
+          value={genderFilter}
+          onChange={(e) => setGenderFilter(e.target.value)}
+          className="border border-gray-300 rounded-md px-4 py-2 text-sm w-full sm:w-48 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
+        >
+          <option value="">All Genders</option>
+          <option value="MALE">Male</option>
+          <option value="FEMALE">Female</option>
+          <option value="OTHER">Other</option>
+          <option value="UNKNOWN">Unknown</option>
+        </select>
       </div>
 
       <div className="bg-white shadow-md rounded-lg overflow-hidden">
@@ -58,8 +97,8 @@ function ProfilesList() {
     </tr>
   )}
 
-  {!isLoading && !isError && profiles?.length > 0 ? (
-    profiles.map((profile: any) => (
+  {!isLoading && !isError && filteredProfiles.length > 0 ? (
+    filteredProfiles.map((profile: any) => (
       <tr key={profile.id} className="hover:bg-gray-50 transition-colors duration-150">
         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{profile.profileNumber || profile.id}</td>
         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{profile.firstName && profile.lastName ? `${profile.firstName} ${profile.lastName}` : 'N/A'}</td>
