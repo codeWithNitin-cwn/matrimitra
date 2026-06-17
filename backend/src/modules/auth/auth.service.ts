@@ -1,8 +1,15 @@
+import type { StringValue } from "ms";
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken"; // <-- change here
+import jwt from "jsonwebtoken";
 import { AuthRepository } from "./auth.repository";
 import { LoginDTO } from "./auth.validator";
 import type { JwtPayload } from "./auth.types";
+import { prisma } from "../../config/prisma";
+
+function isStringValue(val: string): val is StringValue {
+  return /^\d+\s*[a-zA-Z]*$/.test(val);
+}
+
 export class AuthService {
   private repository: AuthRepository;
 
@@ -37,8 +44,24 @@ export class AuthService {
       throw new Error("JWT_SECRET is not configured");
     }
 
+    const jwtExpiresIn = process.env.JWT_EXPIRES_IN || "1d";
+    let expiresIn: StringValue | number = "1d";
+    if (isStringValue(jwtExpiresIn)) {
+      expiresIn = jwtExpiresIn;
+    }
+
     const token = jwt.sign(payload, jwtSecret, { 
-      expiresIn: process.env.JWT_EXPIRES_IN || "1d",
+      expiresIn,
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        agencyId: user.agencyId,
+        userId: user.id,
+        entityType: "USER",
+        entityId: user.id,
+        action: "LOGIN"
+      }
     });
 
     return { token, user: payload };

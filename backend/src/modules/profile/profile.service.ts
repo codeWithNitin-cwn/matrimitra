@@ -1,11 +1,17 @@
 import { ProfileRepository } from "./profile.repository";
 import { CreateProfileDTO, CreateProfilePersonalDTO, CreateProfileEducationDTO, CreateProfileCareerDTO, CreateProfileFamilyDTO, CreateProfileLifestyleDTO, CreateProfilePreferenceDTO, CreateProfileAnswerDTO } from "./profile.validator";
+import { prisma } from "../../config/prisma";
+import { generateProfileSummary } from "../../integrations/gemini.js";
+import { TraitService } from "../match/trait.service.js";
+import crypto from "crypto";
 
 export class ProfileService {
   private repository: ProfileRepository;
+  private traitService: TraitService;
 
   constructor() {
     this.repository = new ProfileRepository();
+    this.traitService = new TraitService();
   }
 
   async createDraft(agencyId: string, assignedUserId: string | undefined, data: any) {
@@ -25,16 +31,80 @@ export class ProfileService {
     );
   }
 
-  async getProfileById(id: string) {
+  async getProfileById(id: string, queryingAgencyId: string, queryingUserId: string) {
     const profile = await this.repository.findFullProfileById(id);
     if (!profile) {
       throw new Error("Profile not found");
     }
+    if (profile.agencyId !== queryingAgencyId) {
+      const isAccepted = await this.repository.hasAcceptedProposal(id, queryingAgencyId);
+      if (!isAccepted) {
+        if (profile.person) {
+          profile.person.firstName = "Partner";
+          profile.person.lastName = "Client";
+          profile.person.email = "Hidden until proposal acceptance";
+          profile.person.mobile = "Hidden until proposal acceptance";
+        }
+        profile.photos = [];
+        profile.documents = [];
+        profile.aiSummary = "Hidden until proposal acceptance";
+        profile.answers = [];
+        profile.families = [];
+        profile.lifestyles = [];
+      }
+    }
+
+    // Generate AI Profile Summary on the fly if profile is ACTIVE or APPROVED
+    if (profile.status === "ACTIVE" || profile.status === "APPROVED") {
+      try {
+        const summary = await generateProfileSummary(profile);
+        (profile as any).aiSummary = summary;
+      } catch (err) {
+        console.error("Failed to generate AI profile summary on demand:", err);
+        (profile as any).aiSummary = "";
+      }
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        agencyId: queryingAgencyId,
+        userId: queryingUserId,
+        entityType: "PROFILE",
+        entityId: id,
+        action: "VIEW"
+      }
+    });
+
+    this.logAccess(id, queryingAgencyId, queryingUserId, "VIEW_PROFILE")
+      .catch(err => console.error("Failed to create profile access log:", err));
+
+    // Parse question texts in answers
+    if (profile.answers && Array.isArray(profile.answers)) {
+      profile.answers = profile.answers.map((ans: any) => {
+        if (ans.question) {
+          try {
+            const parsed = JSON.parse(ans.question.questionText);
+            ans.question = {
+              ...ans.question,
+              questionText: parsed.text || ans.question.questionText,
+              customCategory: parsed.category || ans.question.category,
+              type: parsed.type || "SINGLE_CHOICE"
+            };
+          } catch (e) {
+            ans.question.customCategory = ans.question.category;
+            ans.question.type = "SINGLE_CHOICE";
+          }
+        }
+        return ans;
+      }) as any;
+    }
+
     return profile;
   }
 
-  async getProfiles() {
-    return this.repository.findAllProfiles();
+  async getProfiles(queryingAgencyId: string) {
+    const profiles = await this.repository.findAllProfiles(queryingAgencyId);
+    return profiles;
   }
 
   async createProfile(data: CreateProfileDTO) {
@@ -65,10 +135,13 @@ export class ProfileService {
     });
   }
 
-  async createProfilePersonal(profileId: string, data: CreateProfilePersonalDTO) {
+  async createProfilePersonal(profileId: string, queryingAgencyId: string, data: CreateProfilePersonalDTO) {
     const profile = await this.repository.findProfileById(profileId);
     if (!profile) {
       throw new Error("Agency profile does not exist");
+    }
+    if (profile.agencyId !== queryingAgencyId) {
+      throw new Error("Unauthorized: Profile belongs to another agency");
     }
 
     const existingPersonal = await this.repository.findProfilePersonalByProfileId(profileId);
@@ -82,10 +155,13 @@ export class ProfileService {
     });
   }
 
-  async createProfileEducation(profileId: string, data: CreateProfileEducationDTO) {
+  async createProfileEducation(profileId: string, queryingAgencyId: string, data: CreateProfileEducationDTO) {
     const profile = await this.repository.findProfileById(profileId);
     if (!profile) {
       throw new Error("Agency profile does not exist");
+    }
+    if (profile.agencyId !== queryingAgencyId) {
+      throw new Error("Unauthorized: Profile belongs to another agency");
     }
 
     return this.repository.createProfileEducation({
@@ -94,10 +170,13 @@ export class ProfileService {
     });
   }
 
-  async createProfileCareer(profileId: string, data: CreateProfileCareerDTO) {
+  async createProfileCareer(profileId: string, queryingAgencyId: string, data: CreateProfileCareerDTO) {
     const profile = await this.repository.findProfileById(profileId);
     if (!profile) {
       throw new Error("Agency profile does not exist");
+    }
+    if (profile.agencyId !== queryingAgencyId) {
+      throw new Error("Unauthorized: Profile belongs to another agency");
     }
 
     return this.repository.createProfileCareer({
@@ -106,10 +185,13 @@ export class ProfileService {
     });
   }
 
-  async createProfileFamily(profileId: string, data: CreateProfileFamilyDTO) {
+  async createProfileFamily(profileId: string, queryingAgencyId: string, data: CreateProfileFamilyDTO) {
     const profile = await this.repository.findProfileById(profileId);
     if (!profile) {
       throw new Error("Agency profile does not exist");
+    }
+    if (profile.agencyId !== queryingAgencyId) {
+      throw new Error("Unauthorized: Profile belongs to another agency");
     }
 
     return this.repository.createProfileFamily({
@@ -118,10 +200,13 @@ export class ProfileService {
     });
   }
 
-  async createProfileLifestyle(profileId: string, data: CreateProfileLifestyleDTO) {
+  async createProfileLifestyle(profileId: string, queryingAgencyId: string, data: CreateProfileLifestyleDTO) {
     const profile = await this.repository.findProfileById(profileId);
     if (!profile) {
       throw new Error("Agency profile does not exist");
+    }
+    if (profile.agencyId !== queryingAgencyId) {
+      throw new Error("Unauthorized: Profile belongs to another agency");
     }
 
     return this.repository.createProfileLifestyle({
@@ -130,10 +215,13 @@ export class ProfileService {
     });
   }
 
-  async createProfilePreference(profileId: string, data: CreateProfilePreferenceDTO) {
+  async createProfilePreference(profileId: string, queryingAgencyId: string, data: CreateProfilePreferenceDTO) {
     const profile = await this.repository.findProfileById(profileId);
     if (!profile) {
       throw new Error("Agency profile does not exist");
+    }
+    if (profile.agencyId !== queryingAgencyId) {
+      throw new Error("Unauthorized: Profile belongs to another agency");
     }
 
     return this.repository.createProfilePreference({
@@ -178,8 +266,27 @@ export class ProfileService {
       importance: data.importance as any, // Cast enum to align Zod with Prisma types
     });
   }
-    async updateDraft(profileId: string, data: any) {
-    return this.repository.updateDraftTransaction(profileId, data);
+  async updateDraft(profileId: string, queryingAgencyId: string, queryingUserId: string, data: any) {
+    const profile = await this.repository.findProfileById(profileId);
+    if (!profile) {
+      throw new Error("Profile not found");
+    }
+    if (profile.agencyId !== queryingAgencyId) {
+      throw new Error("Unauthorized: Profile belongs to another agency");
+    }
+    const result = await this.repository.updateDraftTransaction(profileId, data);
+
+    await prisma.auditLog.create({
+      data: {
+        agencyId: queryingAgencyId,
+        userId: queryingUserId,
+        entityType: "PROFILE",
+        entityId: profileId,
+        action: "UPDATE"
+      }
+    });
+
+    return result;
   }
   async getProfileAnswers(profileId: string) {
     const profile = await this.repository.findProfileById(profileId);
@@ -187,5 +294,155 @@ export class ProfileService {
       throw new Error("Agency profile does not exist");
     }
     return this.repository.findProfileAnswers(profileId);
+  }
+
+  async updateStatus(profileId: string, queryingAgencyId: string, queryingUserId: string, status: any) {
+    const profile = await this.repository.findProfileById(profileId);
+    if (!profile) {
+      throw new Error("Profile not found");
+    }
+    if (profile.agencyId !== queryingAgencyId) {
+      throw new Error("Unauthorized: Profile belongs to another agency");
+    }
+
+    if (status === "ACTIVE" && !profile.clientApproved) {
+      throw new Error("Cannot activate profile. Client must approve first");
+    }
+
+    const result = await this.repository.updateStatus(profileId, status);
+
+    await prisma.auditLog.create({
+      data: {
+        agencyId: queryingAgencyId,
+        userId: queryingUserId,
+        entityType: "PROFILE",
+        entityId: profileId,
+        action: status === "ACTIVE" ? "ACTIVATE" : (status === "APPROVED" ? "APPROVE" : status)
+      }
+    });
+
+    if (status === "ACTIVE" || status === "APPROVED") {
+      // Asynchronously trigger traits generation (fire-and-forget) to keep profile approval instant
+      this.repository.findFullProfileById(profileId).then(fullProfile => {
+        if (fullProfile) {
+          this.traitService.generateAndStoreTraits(profileId, fullProfile, false)
+            .catch(err => console.error(`Failed to generate AI traits asynchronously for ${profileId}:`, err));
+        }
+      }).catch(err => console.error(`Failed to load full profile asynchronously for trait generation:`, err));
+    }
+
+    return result;
+  }
+
+  async generateOnboardingLink(profileId: string, queryingAgencyId: string) {
+    const profile = await this.repository.findProfileById(profileId);
+    if (!profile) {
+      throw new Error("Profile not found");
+    }
+    if (profile.agencyId !== queryingAgencyId) {
+      throw new Error("Unauthorized: Profile belongs to another agency");
+    }
+
+    const token = crypto.randomUUID();
+    const expiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    const link = `http://localhost:3000/onboard/${token}`;
+
+    const updated = await prisma.agencyProfile.update({
+      where: { id: profileId },
+      data: {
+        onboardingToken: token,
+        onboardingExpiry: expiry,
+        onboardingLink: link,
+        status: "ONBOARDING_SENT"
+      }
+    });
+
+    return { onboardingLink: link, token, expiry, profile: updated };
+  }
+
+  async getClientProfileByToken(token: string) {
+    const profile = await prisma.agencyProfile.findFirst({
+      where: {
+        onboardingToken: token,
+        onboardingExpiry: { gte: new Date() }
+      }
+    });
+
+    if (!profile) {
+      throw new Error("Invalid or expired onboarding token");
+    }
+
+    return this.repository.findFullProfileById(profile.id);
+  }
+
+  async clientApproveProfile(token: string) {
+    const profile = await prisma.agencyProfile.findFirst({
+      where: {
+        onboardingToken: token,
+        onboardingExpiry: { gte: new Date() }
+      }
+    });
+
+    if (!profile) {
+      throw new Error("Invalid or expired onboarding token");
+    }
+
+    return prisma.agencyProfile.update({
+      where: { id: profile.id },
+      data: {
+        clientApproved: true,
+        clientApprovedAt: new Date(),
+        status: "CLIENT_APPROVED"
+      }
+    });
+  }
+
+  async clientRequestChanges(token: string) {
+    const profile = await prisma.agencyProfile.findFirst({
+      where: {
+        onboardingToken: token,
+        onboardingExpiry: { gte: new Date() }
+      }
+    });
+
+    if (!profile) {
+      throw new Error("Invalid or expired onboarding token");
+    }
+
+    return prisma.agencyProfile.update({
+      where: { id: profile.id },
+      data: {
+        status: "DRAFT",
+        clientApproved: false
+      }
+    });
+  }
+
+  async logAccess(profileId: string, agencyId: string, userId: string, action: string) {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const existingLog = await prisma.profileAccessLog.findFirst({
+      where: {
+        profileId,
+        viewedByUserId: userId,
+        action,
+        viewedAt: { gte: fiveMinutesAgo }
+      }
+    });
+
+    if (existingLog) {
+      return prisma.profileAccessLog.update({
+        where: { id: existingLog.id },
+        data: { viewedAt: new Date() }
+      });
+    }
+
+    return prisma.profileAccessLog.create({
+      data: {
+        profileId,
+        agencyId,
+        viewedByUserId: userId,
+        action
+      }
+    });
   }
 }

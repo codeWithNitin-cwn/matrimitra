@@ -30,8 +30,14 @@ export class ProposalRepository {
     });
   }
 
-  async findAll() {
+  async findAll(agencyId: string) {
     return prisma.proposal.findMany({
+      where: {
+        OR: [
+          { senderAgencyId: agencyId },
+          { receiverAgencyId: agencyId },
+        ],
+      },
       include: {
         senderAgency: { select: { name: true } },
         receiverAgency: { select: { name: true } },

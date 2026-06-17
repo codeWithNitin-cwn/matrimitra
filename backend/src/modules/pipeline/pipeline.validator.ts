@@ -14,12 +14,13 @@ const stages = [
 export const createPipelineSchema = z.object({
   proposalId: z.string().uuid("Invalid Proposal ID format"),
   currentStage: z.enum(stages).default("NEW_PROPOSAL"),
-  updatedBy: z.string().uuid("Invalid User ID format"),
+  // updatedBy is derived from the authenticated JWT — not accepted from client body
 });
 
 export const updatePipelineSchema = z.object({
   currentStage: z.enum(stages),
-  updatedBy: z.string().uuid("Invalid User ID format"),
+  // updatedBy is derived from the authenticated JWT — not accepted from client body
+  notes: z.string().max(1000).optional(),
 });
 
 export type CreatePipelineDTO = z.infer<typeof createPipelineSchema>;

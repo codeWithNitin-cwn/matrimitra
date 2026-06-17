@@ -1,13 +1,19 @@
 import { Router } from "express";
 import { ProposalController } from "./proposal.controller";
+import { requireRole } from "../auth/role.middleware";
 
 const router = Router();
 const proposalController = new ProposalController();
 
-router.post("/", (req, res) => proposalController.createProposal(req, res));
+// Read operations — all roles
 router.get("/", (req, res) => proposalController.getProposals(req, res));
 router.get("/:id", (req, res) => proposalController.getProposalById(req, res));
-router.patch("/:id/accept", (req, res) => proposalController.acceptProposal(req, res));
-router.patch("/:id/reject", (req, res) => proposalController.rejectProposal(req, res));
+
+// Create proposal — EXECUTIVE and above
+router.post("/", requireRole(["OWNER", "MANAGER", "EXECUTIVE"]), (req, res) => proposalController.createProposal(req, res));
+
+// Accept/Reject proposals — MANAGER and above
+router.patch("/:id/accept", requireRole(["OWNER", "MANAGER"]), (req, res) => proposalController.acceptProposal(req, res));
+router.patch("/:id/reject", requireRole(["OWNER", "MANAGER"]), (req, res) => proposalController.rejectProposal(req, res));
 
 export { router as proposalRoutes };

@@ -45,7 +45,15 @@ export const ProfileService = {
     return response.data;
   },
   async updateDraft(id: string, data: any) {
-  const response = await api.put(`/profiles/${id}`, data);
-  return response.data;
-},
+    const response = await api.put(`/profiles/${id}`, data);
+    return response.data;
+  },
+  async updateStatus(id: string, status: string) {
+    const response = await api.patch(`/profiles/${id}/status`, { status });
+    return response.data;
+  },
+  async logAccess(id: string, action: string) {
+    const response = await api.post(`/profiles/${id}/access-log`, { action });
+    return response.data;
+  },
 };

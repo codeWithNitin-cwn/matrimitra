@@ -14,7 +14,7 @@ export class AgencyUserController {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
+            message: validationResult.error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
           }
         });
         return;

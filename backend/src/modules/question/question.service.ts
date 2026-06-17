@@ -18,6 +18,23 @@ export class QuestionService {
   }
 
   async getQuestions() {
-    return this.repository.findAll();
+    const questions = await this.repository.findAll();
+    return questions.map((q) => {
+      try {
+        const parsed = JSON.parse(q.questionText);
+        return {
+          ...q,
+          questionText: parsed.text || q.questionText,
+          customCategory: parsed.category || q.category,
+          type: parsed.type || "SINGLE_CHOICE"
+        };
+      } catch (e) {
+        return {
+          ...q,
+          customCategory: q.category,
+          type: "SINGLE_CHOICE"
+        };
+      }
+    });
   }
 }

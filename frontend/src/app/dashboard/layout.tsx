@@ -30,20 +30,35 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     { name: 'Settings', href: '/dashboard/settings' },
   ];
 
-  if (!user) {
-    // This should ideally be handled by a middleware or a protected route wrapper
-    // but as a fallback, we can redirect or show an access denied message.
-    // For now, we'll just render nothing and let the page.tsx handle the redirect.
-    return null;
+  const [isMounted, setIsMounted] = useState(false);
+
+  React.useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  React.useEffect(() => {
+    if (isMounted && !user) {
+      router.push('/login');
+    }
+  }, [isMounted, user, router]);
+
+  if (!isMounted || !user) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-gray-50 font-sans">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"></div>
+          <p className="text-gray-500 font-medium text-sm">Authenticating session...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="flex h-screen bg-gray-100">
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-64 bg-gray-800 text-white transform ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } md:relative md:translate-x-0 transition-transform duration-200 ease-in-out`}
+        className={`fixed inset-y-0 left-0 z-30 w-64 bg-gray-800 text-white transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          } md:relative md:translate-x-0 transition-transform duration-200 ease-in-out`}
       >
         <div className="flex items-center justify-center h-16 bg-gray-900">
           <span className="text-2xl font-semibold">MM Dashboard</span>

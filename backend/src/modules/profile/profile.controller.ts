@@ -11,7 +11,12 @@ export class ProfileController {
 
   async getProfiles(req: Request, res: Response): Promise<void> {
     try {
-      const profiles = await this.profileService.getProfiles();
+      const agencyId = (req as any).user?.agencyId;
+      if (!agencyId) {
+        res.status(401).json({ success: false, error: { code: "UNAUTHORIZED", message: "Unauthorized agency access" } });
+        return;
+      }
+      const profiles = await this.profileService.getProfiles(agencyId);
       res.status(200).json({ success: true, data: profiles });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to fetch profiles";
@@ -28,7 +33,17 @@ export class ProfileController {
   async getProfileById(req: Request, res: Response): Promise<void> {
     try {
       const { profileId } = req.params;
-      const profile = await this.profileService.getProfileById(profileId);
+      if (typeof profileId !== "string") {
+        res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid profile ID format" } });
+        return;
+      }
+      const agencyId = (req as any).user?.agencyId;
+      const userId = (req as any).user?.id;
+      if (!agencyId || !userId) {
+        res.status(401).json({ success: false, error: { code: "UNAUTHORIZED", message: "Unauthorized agency access" } });
+        return;
+      }
+      const profile = await this.profileService.getProfileById(profileId, agencyId, userId);
       res.status(200).json({ success: true, data: profile });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to fetch profile";
@@ -51,13 +66,20 @@ export class ProfileController {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
+            message: validationResult.error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
           }
         });
         return;
       }
 
-      const profile = await this.profileService.createProfile(validationResult.data);
+      const agencyId = (req as any).user?.agencyId;
+      if (!agencyId) {
+        res.status(401).json({ success: false, error: { code: "UNAUTHORIZED", message: "Unauthorized agency access" } });
+        return;
+      }
+
+      const profileData = { ...validationResult.data, agencyId };
+      const profile = await this.profileService.createProfile(profileData);
 
       res.status(201).json({ success: true, data: profile });
     } catch (error: unknown) {
@@ -81,7 +103,7 @@ export class ProfileController {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
+            message: validationResult.error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
           }
         });
         return;
@@ -109,6 +131,10 @@ export class ProfileController {
   async updateDraft(req: Request, res: Response): Promise<void> {
     try {
       const { profileId } = req.params;
+      if (typeof profileId !== "string") {
+        res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid profile ID format" } });
+        return;
+      }
       const validationResult = createDraftProfileSchema.safeParse(req.body);
 
       if (!validationResult.success) {
@@ -116,13 +142,20 @@ export class ProfileController {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
+            message: validationResult.error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
           }
         });
         return;
       }
 
-      const draft = await this.profileService.updateDraft(profileId, validationResult.data);
+      const agencyId = (req as any).user?.agencyId;
+      const userId = (req as any).user?.id;
+      if (!agencyId || !userId) {
+        res.status(401).json({ success: false, error: { code: "UNAUTHORIZED", message: "Unauthorized agency access" } });
+        return;
+      }
+
+      const draft = await this.profileService.updateDraft(profileId, agencyId, userId, validationResult.data);
       res.status(200).json({ success: true, data: draft });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to update draft profile";
@@ -136,6 +169,10 @@ export class ProfileController {
   async createProfilePersonal(req: Request, res: Response): Promise<void> {
     try {
       const { profileId } = req.params;
+      if (typeof profileId !== "string") {
+        res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid profile ID format" } });
+        return;
+      }
       
       const validationResult = createProfilePersonalSchema.safeParse(req.body);
 
@@ -144,13 +181,19 @@ export class ProfileController {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
+            message: validationResult.error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
           }
         });
         return;
       }
 
-      const profilePersonal = await this.profileService.createProfilePersonal(profileId, validationResult.data);
+      const agencyId = (req as any).user?.agencyId;
+      if (!agencyId) {
+        res.status(401).json({ success: false, error: { code: "UNAUTHORIZED", message: "Unauthorized agency access" } });
+        return;
+      }
+
+      const profilePersonal = await this.profileService.createProfilePersonal(profileId, agencyId, validationResult.data);
 
       res.status(201).json({ success: true, data: profilePersonal });
     } catch (error: unknown) {
@@ -168,6 +211,10 @@ export class ProfileController {
   async createProfileEducation(req: Request, res: Response): Promise<void> {
     try {
       const { profileId } = req.params;
+      if (typeof profileId !== "string") {
+        res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid profile ID format" } });
+        return;
+      }
       
       const validationResult = createProfileEducationSchema.safeParse(req.body);
 
@@ -176,13 +223,19 @@ export class ProfileController {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
+            message: validationResult.error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
           }
         });
         return;
       }
 
-      const profileEducation = await this.profileService.createProfileEducation(profileId, validationResult.data);
+      const agencyId = (req as any).user?.agencyId;
+      if (!agencyId) {
+        res.status(401).json({ success: false, error: { code: "UNAUTHORIZED", message: "Unauthorized agency access" } });
+        return;
+      }
+
+      const profileEducation = await this.profileService.createProfileEducation(profileId, agencyId, validationResult.data);
 
       res.status(201).json({ success: true, data: profileEducation });
     } catch (error: unknown) {
@@ -200,6 +253,10 @@ export class ProfileController {
   async createProfileCareer(req: Request, res: Response): Promise<void> {
     try {
       const { profileId } = req.params;
+      if (typeof profileId !== "string") {
+        res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid profile ID format" } });
+        return;
+      }
       
       const validationResult = createProfileCareerSchema.safeParse(req.body);
 
@@ -208,13 +265,19 @@ export class ProfileController {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
+            message: validationResult.error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
           }
         });
         return;
       }
 
-      const profileCareer = await this.profileService.createProfileCareer(profileId, validationResult.data);
+      const agencyId = (req as any).user?.agencyId;
+      if (!agencyId) {
+        res.status(401).json({ success: false, error: { code: "UNAUTHORIZED", message: "Unauthorized agency access" } });
+        return;
+      }
+
+      const profileCareer = await this.profileService.createProfileCareer(profileId, agencyId, validationResult.data);
 
       res.status(201).json({ success: true, data: profileCareer });
     } catch (error: unknown) {
@@ -232,6 +295,10 @@ export class ProfileController {
   async createProfileFamily(req: Request, res: Response): Promise<void> {
     try {
       const { profileId } = req.params;
+      if (typeof profileId !== "string") {
+        res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid profile ID format" } });
+        return;
+      }
       
       const validationResult = createProfileFamilySchema.safeParse(req.body);
 
@@ -240,13 +307,19 @@ export class ProfileController {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
+            message: validationResult.error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
           }
         });
         return;
       }
 
-      const profileFamily = await this.profileService.createProfileFamily(profileId, validationResult.data);
+      const agencyId = (req as any).user?.agencyId;
+      if (!agencyId) {
+        res.status(401).json({ success: false, error: { code: "UNAUTHORIZED", message: "Unauthorized agency access" } });
+        return;
+      }
+
+      const profileFamily = await this.profileService.createProfileFamily(profileId, agencyId, validationResult.data);
 
       res.status(201).json({ success: true, data: profileFamily });
     } catch (error: unknown) {
@@ -264,6 +337,10 @@ export class ProfileController {
   async createProfileLifestyle(req: Request, res: Response): Promise<void> {
     try {
       const { profileId } = req.params;
+      if (typeof profileId !== "string") {
+        res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid profile ID format" } });
+        return;
+      }
       
       const validationResult = createProfileLifestyleSchema.safeParse(req.body);
 
@@ -272,13 +349,19 @@ export class ProfileController {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
+            message: validationResult.error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
           }
         });
         return;
       }
 
-      const profileLifestyle = await this.profileService.createProfileLifestyle(profileId, validationResult.data);
+      const agencyId = (req as any).user?.agencyId;
+      if (!agencyId) {
+        res.status(401).json({ success: false, error: { code: "UNAUTHORIZED", message: "Unauthorized agency access" } });
+        return;
+      }
+
+      const profileLifestyle = await this.profileService.createProfileLifestyle(profileId, agencyId, validationResult.data);
 
       res.status(201).json({ success: true, data: profileLifestyle });
     } catch (error: unknown) {
@@ -296,6 +379,10 @@ export class ProfileController {
   async createProfilePreference(req: Request, res: Response): Promise<void> {
     try {
       const { profileId } = req.params;
+      if (typeof profileId !== "string") {
+        res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid profile ID format" } });
+        return;
+      }
       
       const validationResult = createProfilePreferenceSchema.safeParse(req.body);
 
@@ -304,13 +391,19 @@ export class ProfileController {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
+            message: validationResult.error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
           }
         });
         return;
       }
 
-      const profilePreference = await this.profileService.createProfilePreference(profileId, validationResult.data);
+      const agencyId = (req as any).user?.agencyId;
+      if (!agencyId) {
+        res.status(401).json({ success: false, error: { code: "UNAUTHORIZED", message: "Unauthorized agency access" } });
+        return;
+      }
+
+      const profilePreference = await this.profileService.createProfilePreference(profileId, agencyId, validationResult.data);
 
       res.status(201).json({ success: true, data: profilePreference });
     } catch (error: unknown) {
@@ -328,6 +421,10 @@ export class ProfileController {
   async createProfileAnswer(req: Request, res: Response): Promise<void> {
     try {
       const { profileId } = req.params;
+      if (typeof profileId !== "string") {
+        res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid profile ID format" } });
+        return;
+      }
       
       const validationResult = createProfileAnswerSchema.safeParse(req.body);
 
@@ -336,7 +433,7 @@ export class ProfileController {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
+            message: validationResult.error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(", ")
           }
         });
         return;
@@ -359,13 +456,130 @@ export class ProfileController {
 
   async getProfileAnswers(req: Request, res: Response): Promise<void> {
     try {
-      const answers = await this.profileService.getProfileAnswers(req.params.profileId);
+      const { profileId } = req.params;
+      if (typeof profileId !== "string") {
+        res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid profile ID format" } });
+        return;
+      }
+      const answers = await this.profileService.getProfileAnswers(profileId);
       res.status(200).json({ success: true, data: answers });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to fetch answers";
       res.status(404).json({
         success: false,
         error: { code: "BUSINESS_RULE_ERROR", message }
+      });
+    }
+  }
+
+  async updateStatus(req: Request, res: Response): Promise<void> {
+    try {
+      const { profileId } = req.params;
+      if (typeof profileId !== "string") {
+        res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid profile ID format" } });
+        return;
+      }
+      const { status } = req.body;
+      if (!status || !["DRAFT", "PENDING", "UNDER_REVIEW", "APPROVED", "REJECTED", "ARCHIVED", "AGENCY_COMPLETED", "ONBOARDING_SENT", "CLIENT_APPROVED", "AGENCY_APPROVED", "ACTIVE"].includes(status)) {
+        res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid status value" } });
+        return;
+      }
+
+      const agencyId = (req as any).user?.agencyId;
+      const userId = (req as any).user?.id;
+      if (!agencyId || !userId) {
+        res.status(401).json({ success: false, error: { code: "UNAUTHORIZED", message: "Unauthorized agency access" } });
+        return;
+      }
+
+      const profile = await this.profileService.updateStatus(profileId, agencyId, userId, status);
+      res.status(200).json({ success: true, data: profile });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to update profile status";
+      res.status(409).json({
+        success: false,
+        error: { code: "BUSINESS_RULE_ERROR", message }
+      });
+    }
+  }
+
+  async generateOnboardingLink(req: Request, res: Response): Promise<void> {
+    try {
+      const profileId = req.params.profileId as string;
+      const agencyId = (req as any).user?.agencyId;
+      if (!agencyId) {
+        res.status(401).json({ success: false, error: { code: "UNAUTHORIZED", message: "Unauthorized agency access" } });
+        return;
+      }
+
+      const result = await this.profileService.generateOnboardingLink(profileId, agencyId);
+      res.status(200).json({ success: true, data: result });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to generate onboarding link";
+      res.status(400).json({ success: false, error: { code: "BUSINESS_RULE_ERROR", message } });
+    }
+  }
+
+  async getClientProfileByToken(req: Request, res: Response): Promise<void> {
+    try {
+      const token = req.params.token as string;
+      const profile = await this.profileService.getClientProfileByToken(token);
+      res.status(200).json({ success: true, data: profile });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to fetch onboarding profile";
+      res.status(400).json({ success: false, error: { code: "BUSINESS_RULE_ERROR", message } });
+    }
+  }
+
+  async clientApproveProfile(req: Request, res: Response): Promise<void> {
+    try {
+      const token = req.params.token as string;
+      const profile = await this.profileService.clientApproveProfile(token);
+      res.status(200).json({ success: true, data: profile });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to approve profile";
+      res.status(400).json({ success: false, error: { code: "BUSINESS_RULE_ERROR", message } });
+    }
+  }
+
+  async clientRequestChanges(req: Request, res: Response): Promise<void> {
+    try {
+      const token = req.params.token as string;
+      const profile = await this.profileService.clientRequestChanges(token);
+      res.status(200).json({ success: true, data: profile });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to submit change request";
+      res.status(400).json({ success: false, error: { code: "BUSINESS_RULE_ERROR", message } });
+    }
+  }
+
+  async logAccess(req: Request, res: Response): Promise<void> {
+    try {
+      const { profileId } = req.params;
+      if (typeof profileId !== "string") {
+        res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid profile ID format" } });
+        return;
+      }
+      const { action } = req.body;
+      if (!action || !["VIEW_PROFILE", "VIEW_PHOTOS", "DOWNLOAD_DOCUMENT"].includes(action)) {
+        res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid action value" } });
+        return;
+      }
+
+      const agencyId = (req as any).user?.agencyId;
+      const userId = (req as any).user?.id;
+      if (!agencyId || !userId) {
+        res.status(401).json({ success: false, error: { code: "UNAUTHORIZED", message: "Unauthorized agency access" } });
+        return;
+      }
+
+      const log = await this.profileService.logAccess(profileId, agencyId, userId, action);
+      res.status(201).json({ success: true, data: log });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to log access";
+      res.status(500).json({
+        success: false,
+        error: { code: "INTERNAL_SERVER_ERROR", message }
       });
     }
   }

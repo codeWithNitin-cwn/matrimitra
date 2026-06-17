@@ -12,6 +12,8 @@ import { pipelineRoutes } from "./modules/pipeline/pipeline.routes";
 import { reportingRoutes } from "./modules/reporting/reporting.routes";
 import { authRoutes } from "./modules/auth/auth.routes";
 import { authenticate } from "./modules/auth/auth.middleware";
+import { followUpRoutes } from "./modules/followup/followup.routes.js";
+import { ProfileController } from "./modules/profile/profile.controller";
 
 const app = express();
 app.use(
@@ -24,6 +26,11 @@ app.use(express.json());
 
 app.use("/api/v1/auth", authRoutes); // Public route
 
+const publicProfileController = new ProfileController();
+app.get("/api/v1/public-onboarding/:token", (req, res) => publicProfileController.getClientProfileByToken(req, res));
+app.post("/api/v1/public-onboarding/:token/approve", (req, res) => publicProfileController.clientApproveProfile(req, res));
+app.post("/api/v1/public-onboarding/:token/request-changes", (req, res) => publicProfileController.clientRequestChanges(req, res));
+
 app.use("/api/v1", authenticate); // Protect all downstream v1 API routes
 
 app.use("/api/v1/agencies", agencyRoutes);
@@ -35,6 +42,7 @@ app.use("/api/v1/matches", matchRoutes);
 app.use("/api/v1/proposals", proposalRoutes);
 app.use("/api/v1/pipeline", pipelineRoutes);
 app.use("/api/v1/reports", reportingRoutes);
+app.use("/api/v1/followups", followUpRoutes);
 
 app.get("/", async (req, res) => {
   const agencyCount = await prisma.agency.count();
