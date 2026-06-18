@@ -261,8 +261,8 @@ export class ProfileRepository {
     });
   }
   
-  async updateDraftTransaction(profileId: string, data: any) {
-    return prisma.$transaction(async (tx) => {
+  async updateDraftTransaction(profileId: string, data: any, existingTx?: any) {
+    const execute = async (tx: any) => {
       const existingProfile = await tx.agencyProfile.findUnique({
         where: { id: profileId },
         include: { person: true }
@@ -467,7 +467,6 @@ export class ProfileRepository {
               },
               update: {
                 selectedOptionId: optionId,
-                // Default to DOESNT_MATTER, not MUST_HAVE
                 importance: ans.importance || 'DOESNT_MATTER',
               },
               create: {
@@ -523,7 +522,12 @@ export class ProfileRepository {
       }
 
       return updatedProfile;
-    });
+    };
+
+    if (existingTx) {
+      return execute(existingTx);
+    }
+    return prisma.$transaction(execute);
   }
 
   async findByProfileNumber(profileNumber: string) {
@@ -563,6 +567,7 @@ export class ProfileRepository {
         preferences: true,
         photos: true,
         documents: true,
+        client: true,
         answers: {
           include: {
             question: true,

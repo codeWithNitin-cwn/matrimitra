@@ -39,16 +39,19 @@ export class PipelineService {
     });
   }
 
-  async getPipeline(proposalId: string) {
+  async getPipeline(proposalId: string, queryingAgencyId: string) {
     const pipeline = await this.repository.findByProposalId(proposalId);
     if (!pipeline) {
       throw new Error("Pipeline not found for this proposal");
+    }
+    if (!pipeline.proposal || (pipeline.proposal.senderAgencyId !== queryingAgencyId && pipeline.proposal.receiverAgencyId !== queryingAgencyId)) {
+      throw new Error("Unauthorized: Agency is not a party to this pipeline");
     }
     return pipeline;
   }
 
   async updatePipeline(proposalId: string, queryingAgencyId: string, queryingUserId: string, data: UpdatePipelineDTO & { notes?: string }) {
-    const existing = await this.getPipeline(proposalId); // Ensure it exists and retrieve current stage as oldStage
+    const existing = await this.getPipeline(proposalId, queryingAgencyId); // Ensure it exists and retrieve current stage as oldStage
     
     if (!existing.proposal || (existing.proposal.senderAgencyId !== queryingAgencyId && existing.proposal.receiverAgencyId !== queryingAgencyId)) {
       throw new Error("Unauthorized: Agency is not a party to this pipeline proposal");

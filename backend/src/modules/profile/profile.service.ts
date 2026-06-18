@@ -15,7 +15,8 @@ export class ProfileService {
   }
 
   async createDraft(agencyId: string, assignedUserId: string | undefined, data: any) {
-    const profileNumber = `PR-${Date.now()}`;
+    const randomSuffix = crypto.randomBytes(3).toString("hex");
+    const profileNumber = `PR-${Date.now()}-${randomSuffix}`;
     
     let profileType = 'OTHER';
     if (data.gender) {
@@ -44,6 +45,11 @@ export class ProfileService {
           profile.person.lastName = "Client";
           profile.person.email = "Hidden until proposal acceptance";
           profile.person.mobile = "Hidden until proposal acceptance";
+        }
+        if (profile.client) {
+          profile.client.email = "Hidden until proposal acceptance";
+          profile.client.mobile = "Hidden until proposal acceptance";
+          profile.client.address = "Hidden until proposal acceptance";
         }
         profile.photos = [];
         profile.documents = [];
@@ -128,6 +134,16 @@ export class ProfileService {
       if (!assignedUser) {
         throw new Error("Assigned user does not exist");
       }
+    }
+
+    // Validate that profileType matches person gender
+    const genderUpper = person.gender.toUpperCase();
+    const typeUpper = data.profileType.toUpperCase();
+    if (typeUpper === "BRIDE" && genderUpper !== "FEMALE") {
+      throw new Error("Invalid profile: A BRIDE profile must have FEMALE gender");
+    }
+    if (typeUpper === "GROOM" && genderUpper !== "MALE") {
+      throw new Error("Invalid profile: A GROOM profile must have MALE gender");
     }
 
     return this.repository.create({
@@ -267,13 +283,28 @@ export class ProfileService {
     });
   }
   async updateDraft(profileId: string, queryingAgencyId: string, queryingUserId: string, data: any) {
-    const profile = await this.repository.findProfileById(profileId);
+    const profile = await this.repository.findFullProfileById(profileId);
     if (!profile) {
       throw new Error("Profile not found");
     }
     if (profile.agencyId !== queryingAgencyId) {
       throw new Error("Unauthorized: Profile belongs to another agency");
     }
+
+    // Validate that profileType matches person gender
+    const resolvedGender = data.gender || (profile.person ? profile.person.gender : "UNKNOWN");
+    const resolvedType = data.profileType || profile.profileType || "OTHER";
+
+    const genderUpper = resolvedGender.toUpperCase();
+    const typeUpper = resolvedType.toUpperCase();
+
+    if (typeUpper === "BRIDE" && genderUpper !== "FEMALE") {
+      throw new Error("Invalid profile: A BRIDE profile must have FEMALE gender");
+    }
+    if (typeUpper === "GROOM" && genderUpper !== "MALE") {
+      throw new Error("Invalid profile: A GROOM profile must have MALE gender");
+    }
+
     const result = await this.repository.updateDraftTransaction(profileId, data);
 
     await prisma.auditLog.create({
@@ -296,7 +327,35 @@ export class ProfileService {
     return this.repository.findProfileAnswers(profileId);
   }
 
-  async updateStatus(profileId: string, queryingAgencyId: string, queryingUserId: string, status: any, reason?: string) {
+  async validateActiveProfile(profileId: string) {
+    const profile = await this.repository.findFullProfileById(profileId);
+    if (!profile) {
+      throw new Error("Profile not found");
+    }
+    const missingFields: string[] = [];
+
+    if (!profile.person?.firstName || profile.person.firstName.trim() === "") {
+      missingFields.push("First Name (person.firstName)");
+    }
+    if (!profile.person?.gender || profile.person.gender.trim() === "") {
+      missingFields.push("Gender (person.gender)");
+    }
+    if (!profile.person?.dob) {
+      missingFields.push("Date of Birth (person.dob)");
+    }
+    if (!profile.personal?.city || profile.personal.city.trim() === "") {
+      missingFields.push("City (personal.city)");
+    }
+    if (!profile.preferences || profile.preferences.length === 0) {
+      missingFields.push("Expectations/Preferences record (preferences)");
+    }
+
+    if (missingFields.length > 0) {
+      throw new Error(`Profile cannot be activated. Missing required fields: ${missingFields.join(", ")}`);
+    }
+  }
+
+  async updateStatus(profileId: string, queryingAgencyId: string, queryingUserId: string, status: any, reason?: string, userRole?: string) {
     const profile = await this.repository.findProfileById(profileId);
     if (!profile) {
       throw new Error("Profile not found");
@@ -308,21 +367,24 @@ export class ProfileService {
     let result;
     if (status === "ACTIVE") {
       const isClientApproved = profile.clientApproved || profile.status === "CLIENT_UPDATED";
-      const newStatus = isClientApproved ? "ACTIVE" : "PENDING";
+      const isOwner = userRole === "OWNER";
+
+      if (!isClientApproved && !isOwner) {
+        throw new Error("Cannot activate profile. Client must approve first");
+      }
+
+      // Validate completeness before activating
+      await this.validateActiveProfile(profileId);
 
       result = await prisma.agencyProfile.update({
         where: { id: profileId },
         data: {
           agencyApproved: true,
           agencyApprovedAt: new Date(),
-          clientApproved: isClientApproved,
-          status: newStatus
+          clientApproved: true,
+          status: "ACTIVE"
         }
       });
-
-      if (!isClientApproved) {
-        throw new Error("Cannot activate profile. Client must approve first");
-      }
     } else {
       // If setting to another status (like DRAFT, CORRECTION_REQUESTED, etc.)
       const dataUpdate: any = { status };
@@ -424,6 +486,10 @@ export class ProfileService {
     const isAgencyApproved = profile.agencyApproved;
     const newStatus = isAgencyApproved ? "ACTIVE" : "PENDING";
 
+    if (newStatus === "ACTIVE") {
+      await this.validateActiveProfile(profile.id);
+    }
+
     return prisma.agencyProfile.update({
       where: { id: profile.id },
       data: {
@@ -447,17 +513,20 @@ export class ProfileService {
       throw new Error("Invalid or expired onboarding token");
     }
 
-    // Call existing repository transaction to update fields
-    await this.repository.updateDraftTransaction(profile.id, data);
+    // Run both the draft update and the status update in a single transaction
+    return prisma.$transaction(async (tx) => {
+      // 1. Update draft using the shared transaction client tx
+      await this.repository.updateDraftTransaction(profile.id, data, tx);
 
-    // After updating, set clientApproved: true and status: CLIENT_UPDATED
-    return prisma.agencyProfile.update({
-      where: { id: profile.id },
-      data: {
-        clientApproved: true,
-        status: "CLIENT_UPDATED",
-        clientRejectedReason: null
-      }
+      // 2. Set clientApproved and status inside the same transaction
+      return tx.agencyProfile.update({
+        where: { id: profile.id },
+        data: {
+          clientApproved: true,
+          status: "CLIENT_UPDATED",
+          clientRejectedReason: null
+        }
+      });
     });
   }
 

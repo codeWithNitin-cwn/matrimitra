@@ -68,6 +68,10 @@ export class FollowUpController {
       res.status(201).json({ success: true, data: log });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to create follow-up";
+      if (message.includes("Unauthorized")) {
+        res.status(403).json({ success: false, error: { code: "FORBIDDEN", message } });
+        return;
+      }
       res.status(400).json({ success: false, error: { code: "BUSINESS_RULE_ERROR", message } });
     }
   }

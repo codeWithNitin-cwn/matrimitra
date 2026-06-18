@@ -24,6 +24,46 @@ export class ProposalService {
     if (!groomProfile) throw new Error("Groom profile not found");
     if (groomProfile.status !== "ACTIVE") throw new Error("Groom profile is not ACTIVE");
 
+    // Validate profile types and genders
+    if (brideProfile.profileType.toUpperCase() !== "BRIDE") {
+      throw new Error("Invalid proposal: Bride profile must have profileType of BRIDE");
+    }
+    if (groomProfile.profileType.toUpperCase() !== "GROOM") {
+      throw new Error("Invalid proposal: Groom profile must have profileType of GROOM");
+    }
+    if ((brideProfile as any).person?.gender?.toUpperCase() !== "FEMALE") {
+      throw new Error("Invalid proposal: Bride profile must belong to a person of FEMALE gender");
+    }
+    if ((groomProfile as any).person?.gender?.toUpperCase() !== "MALE") {
+      throw new Error("Invalid proposal: Groom profile must belong to a person of MALE gender");
+    }
+
+    // Enforce agency ownership validation
+    const isBrideOwnerSender = brideProfile.agencyId === agencyId;
+    const isBrideOwnerReceiver = brideProfile.agencyId === data.receiverAgencyId;
+    const isGroomOwnerSender = groomProfile.agencyId === agencyId;
+    const isGroomOwnerReceiver = groomProfile.agencyId === data.receiverAgencyId;
+
+    if (brideProfile.agencyId === groomProfile.agencyId) {
+      throw new Error("Invalid proposal: Bride and Groom profiles cannot belong to the same agency");
+    }
+
+    const validPairing = (isBrideOwnerSender && isGroomOwnerReceiver) || (isGroomOwnerSender && isBrideOwnerReceiver);
+    if (!validPairing) {
+      throw new Error("Invalid proposal: One profile must belong to the sender agency and the other to the receiver agency. Third-party profiles are not allowed.");
+    }
+
+    const activeProposal = await prisma.proposal.findFirst({
+      where: {
+        brideProfileId: data.brideProfileId,
+        groomProfileId: data.groomProfileId,
+        proposalStatus: { in: ["SENT", "PENDING", "ACCEPTED"] }
+      }
+    });
+    if (activeProposal) {
+      throw new Error("Invalid proposal: An active proposal already exists between these profiles");
+    }
+
     const proposalNumber = `PROP-${Date.now()}`;
     const proposalStatus = "SENT"; // Initial status
 
@@ -64,38 +104,63 @@ export class ProposalService {
       throw new Error(`Cannot accept proposal with current status: ${proposal.proposalStatus}`);
     }
 
-    const result = await this.repository.updateStatus(id, "ACCEPTED", {
-      proposalId: id,
-      activityType: "ACCEPTED",
-      activityNotes: activityData.activityNotes,
-      performedBy: queryingUserId,
-    });
+    // Run everything in a single transaction
+    return prisma.$transaction(async (tx) => {
+      // 1. Update proposal status
+      await tx.proposal.update({
+        where: { id },
+        data: { proposalStatus: "ACCEPTED" }
+      });
 
-    try {
-      const existingPipeline = await prisma.pipeline.findUnique({
+      // 2. Create proposal activity record
+      const activity = await tx.proposalActivity.create({
+        data: {
+          proposalId: id,
+          activityType: "ACCEPTED",
+          activityNotes: activityData.activityNotes,
+          performedBy: queryingUserId,
+        }
+      });
+
+      // 3. Create pipeline record (and verify constraints)
+      const fullProposal = await tx.proposal.findUnique({
+        where: { id },
+        include: { brideProfile: true, groomProfile: true }
+      });
+      if (!fullProposal) {
+        throw new Error("Proposal not found");
+      }
+      if (fullProposal.brideProfile.status !== "ACTIVE" || fullProposal.groomProfile.status !== "ACTIVE") {
+        throw new Error("Cannot create pipeline. Profiles must be ACTIVE");
+      }
+
+      const existingPipeline = await tx.pipeline.findUnique({
         where: { proposalId: id }
       });
       if (!existingPipeline) {
-        await this.pipelineService.createPipeline({
-          proposalId: id,
-          currentStage: "PROFILE_SHARED"
-        }, queryingAgencyId, queryingUserId);
+        await tx.pipeline.create({
+          data: {
+            proposalId: id,
+            currentStage: "PROFILE_SHARED",
+            updatedBy: queryingUserId,
+            stageDate: new Date()
+          }
+        });
       }
-    } catch (e) {
-      console.error("Failed to automatically create pipeline:", e);
-    }
 
-    await prisma.auditLog.create({
-      data: {
-        agencyId: queryingAgencyId,
-        userId: queryingUserId,
-        entityType: "PROPOSAL",
-        entityId: id,
-        action: "ACCEPT"
-      }
+      // 4. Log audit event
+      await tx.auditLog.create({
+        data: {
+          agencyId: queryingAgencyId,
+          userId: queryingUserId,
+          entityType: "PROPOSAL",
+          entityId: id,
+          action: "ACCEPT"
+        }
+      });
+
+      return activity;
     });
-
-    return result;
   }
 
   async rejectProposal(id: string, queryingAgencyId: string, queryingUserId: string, activityData: AddActivityDTO) {

@@ -1,5 +1,6 @@
 import { FollowUpRepository } from "./followup.repository.js";
 import { CreateFollowUpDTO, UpdateFollowUpDTO } from "./followup.validator.js";
+import { prisma } from "../../config/prisma.js";
 
 export class FollowUpService {
   private repository: FollowUpRepository;
@@ -22,6 +23,30 @@ export class FollowUpService {
   }
 
   async createFollowUp(data: CreateFollowUpDTO, agencyId: string) {
+    // 1. Profile ownership check
+    const profile = await prisma.agencyProfile.findUnique({
+      where: { id: data.profileId }
+    });
+    if (!profile) {
+      throw new Error("Profile not found");
+    }
+    if (profile.agencyId !== agencyId) {
+      throw new Error("Unauthorized: Profile belongs to another agency");
+    }
+
+    // 2. Proposal participation check (if proposalId is provided)
+    if (data.proposalId) {
+      const proposal = await prisma.proposal.findUnique({
+        where: { id: data.proposalId }
+      });
+      if (!proposal) {
+        throw new Error("Proposal not found");
+      }
+      if (proposal.senderAgencyId !== agencyId && proposal.receiverAgencyId !== agencyId) {
+        throw new Error("Unauthorized: Your agency is not a party to this proposal");
+      }
+    }
+
     return this.repository.create({
       profileId: data.profileId,
       proposalId: data.proposalId || null,

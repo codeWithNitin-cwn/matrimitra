@@ -8,7 +8,10 @@ export class ProposalRepository {
   }
 
   async findProfileById(id: string) {
-    return prisma.agencyProfile.findUnique({ where: { id } });
+    return prisma.agencyProfile.findUnique({
+      where: { id },
+      include: { person: true }
+    });
   }
 
   // Proposal methods

@@ -487,12 +487,13 @@ export class ProfileController {
 
       const agencyId = (req as any).user?.agencyId;
       const userId = (req as any).user?.id;
+      const userRole = (req as any).user?.role;
       if (!agencyId || !userId) {
         res.status(401).json({ success: false, error: { code: "UNAUTHORIZED", message: "Unauthorized agency access" } });
         return;
       }
 
-      const profile = await this.profileService.updateStatus(profileId, agencyId, userId, status, reason);
+      const profile = await this.profileService.updateStatus(profileId, agencyId, userId, status, reason, userRole);
       res.status(200).json({ success: true, data: profile });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to update profile status";

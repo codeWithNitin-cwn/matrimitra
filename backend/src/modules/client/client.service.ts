@@ -1,6 +1,7 @@
 import { ClientRepository } from "./client.repository";
 import { CreateClientDTO, UpdateClientDTO, CreateClientNoteDTO, CreatePaymentDTO } from "./client.validator";
 import { prisma } from "../../config/prisma";
+import crypto from "crypto";
 
 export class ClientService {
   private repository: ClientRepository;
@@ -38,9 +39,9 @@ export class ClientService {
   }
 
   async createClient(agencyId: string, userId: string, data: CreateClientDTO) {
-    // Generate business-friendly client code: CL-YYYYMMDD-XXXX
-    const randomCode = Math.floor(1000 + Math.random() * 9000);
-    const clientCode = `CL-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${randomCode}`;
+    // Generate business-friendly client code: CL-YYYYMMDD-ff38a2c1
+    const randomSuffix = crypto.randomBytes(4).toString("hex");
+    const clientCode = `CL-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${randomSuffix}`;
 
     const client = await this.repository.create({
       agencyId,
