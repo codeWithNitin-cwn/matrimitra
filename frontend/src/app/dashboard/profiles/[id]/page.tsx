@@ -60,12 +60,24 @@ export default function ViewProfilePage() {
     },
   });
 
+  const generateOnboardingMutation = useMutation({
+    mutationFn: () => ProfileService.generateOnboardingLink(id),
+    onSuccess: () => {
+      toast.success('Onboarding link generated!');
+      queryClient.invalidateQueries({ queryKey: ['profile', id] });
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.error?.message || 'Failed to generate link.';
+      toast.error(message);
+    }
+  });
+
   const handleApprove = () => {
-    updateStatusMutation.mutate('APPROVED');
+    updateStatusMutation.mutate('ACTIVE');
   };
 
   const handleReject = () => {
-    updateStatusMutation.mutate('REJECTED');
+    updateStatusMutation.mutate('DRAFT');
   };
 
   if (isPending) {
@@ -114,9 +126,9 @@ export default function ViewProfilePage() {
             <p className="mt-1 text-sm text-gray-500">Profile ID: {profile.profileNumber} • Rel: {profile.relationshipToClient || 'N/A'}</p>
           </div>
           <span className={`inline-flex items-center rounded-md px-2.5 py-0.5 text-sm font-medium ${
-            profile.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
-            profile.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
-            'bg-yellow-100 text-yellow-800'
+            profile.status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
+            profile.status === 'UNDER_REVIEW' ? 'bg-yellow-100 text-yellow-800' :
+            'bg-gray-100 text-gray-805'
           }`}>
             {profile.status}
           </span>
@@ -129,22 +141,22 @@ export default function ViewProfilePage() {
           >
             Edit Profile
           </Link>
-          {profile.status !== 'APPROVED' && (
+          {profile.status !== 'ACTIVE' && (
             <button
               onClick={handleApprove}
-              disabled={updateStatusMutation.isPending}
-              className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50 hover:cursor-pointer"
+              disabled={updateStatusMutation.isPending || profile.agencyApproved}
+              className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-505 disabled:opacity-50 disabled:cursor-not-allowed hover:cursor-pointer"
             >
-              Approve
+              {profile.agencyApproved ? 'Agency Approved' : (profile.clientApproved ? 'Approve & Activate' : 'Agency Approve')}
             </button>
           )}
-          {profile.status !== 'REJECTED' && (
+          {profile.status !== 'DRAFT' && (
             <button
               onClick={handleReject}
               disabled={updateStatusMutation.isPending}
-              className="inline-flex items-center justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 disabled:opacity-50 hover:cursor-pointer"
+              className="inline-flex items-center justify-center rounded-md bg-red-650 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 disabled:opacity-50 hover:cursor-pointer"
             >
-              Reject
+              Revert to Draft
             </button>
           )}
         </div>
@@ -371,6 +383,71 @@ export default function ViewProfilePage() {
 
         {/* Right Column - Side Panel */}
         <div className="space-y-6">
+
+          {/* Card: Client Onboarding */}
+          <div className="bg-white shadow rounded-lg overflow-hidden border border-gray-200 p-4 space-y-4">
+            <h3 className="text-sm font-bold text-gray-905 uppercase tracking-wider border-b pb-2">Client Onboarding</h3>
+            
+            {/* Status indicators */}
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-gray-50 p-2 rounded border border-gray-100">
+                <span className="block text-[10px] text-gray-400 font-semibold uppercase">Client Review</span>
+                <span className={`font-bold mt-1 block ${profile.clientApproved ? 'text-emerald-600' : 'text-amber-500'}`}>
+                  {profile.clientApproved ? 'Approved ✓' : 'Pending'}
+                </span>
+              </div>
+              <div className="bg-gray-50 p-2 rounded border border-gray-100">
+                <span className="block text-[10px] text-gray-400 font-semibold uppercase">Agency Review</span>
+                <span className={`font-bold mt-1 block ${profile.agencyApproved ? 'text-emerald-600' : 'text-amber-500'}`}>
+                  {profile.agencyApproved ? 'Approved ✓' : 'Pending'}
+                </span>
+              </div>
+            </div>
+
+            {/* Rejection/Correction reasons */}
+            {profile.clientRejectedReason && (
+              <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-3 rounded-md">
+                <span className="font-bold block mb-1">Revisions requested by client:</span>
+                <p className="italic">"{profile.clientRejectedReason}"</p>
+              </div>
+            )}
+
+            {/* Link details */}
+            {profile.onboardingLink ? (
+              <div className="space-y-2">
+                <div className="text-xs bg-slate-50 border border-gray-200 p-2.5 rounded break-all text-gray-600 font-mono">
+                  {profile.onboardingLink}
+                </div>
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-[10px] text-gray-400">
+                    Expires: {new Date(profile.onboardingExpiry).toLocaleDateString()}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(profile.onboardingLink);
+                      toast.success("Onboarding link copied!");
+                    }}
+                    className="text-xs font-semibold text-indigo-650 hover:text-indigo-850"
+                  >
+                    Copy Link
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 italic">No active review link generated.</p>
+            )}
+
+            {/* Generate link button */}
+            <button
+              type="button"
+              disabled={generateOnboardingMutation.isPending}
+              onClick={() => generateOnboardingMutation.mutate()}
+              className="w-full inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-505 disabled:opacity-50"
+            >
+              {generateOnboardingMutation.isPending ? 'Generating...' : (profile.onboardingLink ? 'Regenerate Link' : 'Generate Onboarding Link')}
+            </button>
+          </div>
 
           {/* Card: Primary Photo */}
           <div className="bg-white shadow rounded-lg overflow-hidden border border-gray-200 p-4">

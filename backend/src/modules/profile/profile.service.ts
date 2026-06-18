@@ -305,11 +305,35 @@ export class ProfileService {
       throw new Error("Unauthorized: Profile belongs to another agency");
     }
 
-    if (status === "ACTIVE" && !profile.clientApproved) {
-      throw new Error("Cannot activate profile. Client must approve first");
-    }
+    let result;
+    if (status === "ACTIVE") {
+      const isClientApproved = profile.clientApproved;
+      const newStatus = isClientApproved ? "ACTIVE" : "UNDER_REVIEW";
 
-    const result = await this.repository.updateStatus(profileId, status);
+      result = await prisma.agencyProfile.update({
+        where: { id: profileId },
+        data: {
+          agencyApproved: true,
+          agencyApprovedAt: new Date(),
+          status: newStatus
+        }
+      });
+
+      if (!isClientApproved) {
+        throw new Error("Cannot activate profile. Client must approve first");
+      }
+    } else {
+      // If setting to another status (like DRAFT or UNDER_REVIEW), also update flags if needed
+      const dataUpdate: any = { status };
+      if (status === "DRAFT") {
+        dataUpdate.agencyApproved = false;
+        dataUpdate.clientApproved = false;
+      }
+      result = await prisma.agencyProfile.update({
+        where: { id: profileId },
+        data: dataUpdate
+      });
+    }
 
     await prisma.auditLog.create({
       data: {
@@ -317,11 +341,11 @@ export class ProfileService {
         userId: queryingUserId,
         entityType: "PROFILE",
         entityId: profileId,
-        action: status === "ACTIVE" ? "ACTIVATE" : (status === "APPROVED" ? "APPROVE" : status)
+        action: status === "ACTIVE" ? "ACTIVATE" : status
       }
     });
 
-    if (status === "ACTIVE" || status === "APPROVED") {
+    if (status === "ACTIVE") {
       // Asynchronously trigger traits generation (fire-and-forget) to keep profile approval instant
       this.repository.findFullProfileById(profileId).then(fullProfile => {
         if (fullProfile) {
@@ -353,7 +377,10 @@ export class ProfileService {
         onboardingToken: token,
         onboardingExpiry: expiry,
         onboardingLink: link,
-        status: "ONBOARDING_SENT"
+        status: "UNDER_REVIEW",
+        clientApproved: false,
+        agencyApproved: false,
+        clientRejectedReason: null
       }
     });
 
@@ -387,17 +414,21 @@ export class ProfileService {
       throw new Error("Invalid or expired onboarding token");
     }
 
+    const isAgencyApproved = profile.agencyApproved;
+    const newStatus = isAgencyApproved ? "ACTIVE" : "UNDER_REVIEW";
+
     return prisma.agencyProfile.update({
       where: { id: profile.id },
       data: {
         clientApproved: true,
         clientApprovedAt: new Date(),
-        status: "CLIENT_APPROVED"
+        status: newStatus,
+        clientRejectedReason: null
       }
     });
   }
 
-  async clientRequestChanges(token: string) {
+  async clientRequestChanges(token: string, reason?: string) {
     const profile = await prisma.agencyProfile.findFirst({
       where: {
         onboardingToken: token,
@@ -412,8 +443,9 @@ export class ProfileService {
     return prisma.agencyProfile.update({
       where: { id: profile.id },
       data: {
-        status: "DRAFT",
-        clientApproved: false
+        status: "UNDER_REVIEW",
+        clientApproved: false,
+        clientRejectedReason: reason || null
       }
     });
   }

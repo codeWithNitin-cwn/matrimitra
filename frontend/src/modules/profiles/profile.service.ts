@@ -56,4 +56,8 @@ export const ProfileService = {
     const response = await api.post(`/profiles/${id}/access-log`, { action });
     return response.data;
   },
+  async generateOnboardingLink(id: string) {
+    const response = await api.post(`/profiles/${id}/onboarding-link`);
+    return response.data?.data;
+  },
 };

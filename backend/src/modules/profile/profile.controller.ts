@@ -545,7 +545,8 @@ export class ProfileController {
   async clientRequestChanges(req: Request, res: Response): Promise<void> {
     try {
       const token = req.params.token as string;
-      const profile = await this.profileService.clientRequestChanges(token);
+      const { reason } = req.body;
+      const profile = await this.profileService.clientRequestChanges(token, reason);
       res.status(200).json({ success: true, data: profile });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to submit change request";

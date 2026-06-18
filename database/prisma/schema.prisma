@@ -78,6 +78,9 @@ model AgencyProfile {
   onboardingToken        String?             @unique
   clientApproved         Boolean             @default(false)
   clientApprovedAt       DateTime?
+  agencyApproved         Boolean             @default(false)
+  agencyApprovedAt       DateTime?
+  clientRejectedReason   String?
   profileNumber          String              @unique
   profileType            String
   relationshipToClient   String?
