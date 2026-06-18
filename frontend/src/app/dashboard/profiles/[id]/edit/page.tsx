@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ProfileService } from '@/services/profile.service';
+import { ProfileService } from '@/modules/profiles/profile.service';
 import api from '@/services/api';
 import toast from 'react-hot-toast';
 

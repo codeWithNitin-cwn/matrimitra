@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { useMutation } from "@tanstack/react-query";
-import { ClientService } from "@/services/client.service";
-import { useAuthStore } from "@/store/auth.store";
+import { ClientService } from "@/modules/clients/client.service";
+import { useAuthStore } from "@/modules/auth/auth.store";
 import toast from "react-hot-toast";
 
 interface ClientFormInputs {

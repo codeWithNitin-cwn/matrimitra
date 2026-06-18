@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuthStore } from '../../store/auth.store';
+import { useAuthStore } from '../../modules/auth/auth.store';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;

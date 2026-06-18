@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ClientService } from "@/services/client.service";
+import { ClientService } from "@/modules/clients/client.service";
 import toast from "react-hot-toast";
 
 interface ClientFormInputs {
