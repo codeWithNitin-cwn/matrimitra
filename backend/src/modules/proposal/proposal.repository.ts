@@ -41,6 +41,9 @@ export class ProposalRepository {
       include: {
         senderAgency: { select: { name: true } },
         receiverAgency: { select: { name: true } },
+        pipeline: true,
+        brideProfile: { include: { person: true } },
+        groomProfile: { include: { person: true } },
       },
       orderBy: { createdAt: 'desc' },
     });

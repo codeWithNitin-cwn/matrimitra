@@ -1,12 +1,341 @@
 import { prisma } from "../../backend/src/config/prisma";
-import * as bcrypt from "bcryptjs";
+
+const rawQuestions = [
+  // Category 1: Relationship & Communication (RELATIONSHIP)
+  {
+    text: "How do you usually handle disagreements?",
+    category: "Relationship & Communication",
+    dbCategory: "RELATIONSHIP",
+    type: "SINGLE_CHOICE",
+    options: ["Discuss immediately", "Take time and discuss later", "Prefer mediation", "Avoid confrontation"]
+  },
+  {
+    text: "How important is daily communication with your partner?",
+    category: "Relationship & Communication",
+    dbCategory: "RELATIONSHIP",
+    type: "SINGLE_CHOICE",
+    options: ["Extremely important", "Important", "Moderate", "Not important"]
+  },
+  {
+    text: "When stressed, what support do you expect from your partner?",
+    category: "Relationship & Communication",
+    dbCategory: "RELATIONSHIP",
+    type: "SINGLE_CHOICE",
+    options: ["Emotional support", "Practical solutions", "Space and independence", "Depends on situation"]
+  },
+  {
+    text: "Which quality matters most in a spouse?",
+    category: "Relationship & Communication",
+    dbCategory: "RELATIONSHIP",
+    type: "SINGLE_CHOICE",
+    options: ["Trust", "Loyalty", "Respect", "Communication", "Emotional understanding"]
+  },
+
+  // Category 2: Marriage Expectations (RELATIONSHIP)
+  {
+    text: "Why do you want to get married?",
+    category: "Marriage Expectations",
+    dbCategory: "RELATIONSHIP",
+    type: "SINGLE_CHOICE",
+    options: ["Companionship", "Family building", "Emotional connection", "Social/cultural reasons", "Shared life goals"]
+  },
+  {
+    text: "What does a successful marriage mean to you?",
+    category: "Marriage Expectations",
+    dbCategory: "RELATIONSHIP",
+    type: "LONG_TEXT",
+    options: []
+  },
+  {
+    text: "What is your biggest expectation from marriage?",
+    category: "Marriage Expectations",
+    dbCategory: "RELATIONSHIP",
+    type: "LONG_TEXT",
+    options: []
+  },
+
+  // Category 3: Family Compatibility (FAMILY_VALUES)
+  {
+    text: "Preferred family setup after marriage?",
+    category: "Family Compatibility",
+    dbCategory: "FAMILY_VALUES",
+    type: "SINGLE_CHOICE",
+    options: ["Joint family", "Nuclear family", "Either"]
+  },
+  {
+    text: "How involved should parents be in major decisions?",
+    category: "Family Compatibility",
+    dbCategory: "FAMILY_VALUES",
+    type: "SINGLE_CHOICE",
+    options: ["Highly involved", "Moderately involved", "Minimal involvement"]
+  },
+  {
+    text: "Family or career during major conflicts?",
+    category: "Family Compatibility",
+    dbCategory: "FAMILY_VALUES",
+    type: "SINGLE_CHOICE",
+    options: ["Family first", "Career first", "Balance both"]
+  },
+  {
+    text: "How important are traditions and customs?",
+    category: "Family Compatibility",
+    dbCategory: "FAMILY_VALUES",
+    type: "SINGLE_CHOICE",
+    options: ["Very important", "Important", "Neutral", "Not important"]
+  },
+
+  // Category 4: Children Compatibility (FAMILY_VALUES)
+  {
+    text: "Do you want children?",
+    category: "Children Compatibility",
+    dbCategory: "FAMILY_VALUES",
+    type: "SINGLE_CHOICE",
+    options: ["Yes", "No", "Undecided"]
+  },
+  {
+    text: "Preferred timeline for children?",
+    category: "Children Compatibility",
+    dbCategory: "FAMILY_VALUES",
+    type: "SINGLE_CHOICE",
+    options: ["Immediately", "1-2 years", "3-5 years", "Later"]
+  },
+  {
+    text: "Parenting style preference?",
+    category: "Children Compatibility",
+    dbCategory: "FAMILY_VALUES",
+    type: "SINGLE_CHOICE",
+    options: ["Strict", "Balanced", "Liberal"]
+  },
+  {
+    text: "Who should take primary parenting responsibility?",
+    category: "Children Compatibility",
+    dbCategory: "FAMILY_VALUES",
+    type: "SINGLE_CHOICE",
+    options: ["Both equally", "Mostly mother", "Mostly father", "Situation dependent"]
+  },
+
+  // Category 5: Career Compatibility (LIFESTYLE)
+  {
+    text: "Should both partners work after marriage?",
+    category: "Career Compatibility",
+    dbCategory: "LIFESTYLE",
+    type: "SINGLE_CHOICE",
+    options: ["Yes", "No", "Depends"]
+  },
+  {
+    text: "Would you relocate for your spouse's career?",
+    category: "Career Compatibility",
+    dbCategory: "LIFESTYLE",
+    type: "SINGLE_CHOICE",
+    options: ["Yes", "No", "Depends"]
+  },
+  {
+    text: "How important is career growth?",
+    category: "Career Compatibility",
+    dbCategory: "LIFESTYLE",
+    type: "SINGLE_CHOICE",
+    options: ["Extremely important", "Important", "Moderate", "Not important"]
+  },
+  {
+    text: "Preferred lifestyle?",
+    category: "Career Compatibility",
+    dbCategory: "LIFESTYLE",
+    type: "SINGLE_CHOICE",
+    options: ["Career focused", "Family focused", "Balanced"]
+  },
+
+  // Category 6: Financial Compatibility (LIFESTYLE)
+  {
+    text: "Spending style?",
+    category: "Financial Compatibility",
+    dbCategory: "LIFESTYLE",
+    type: "SINGLE_CHOICE",
+    options: ["Saver", "Balanced", "Spender"]
+  },
+  {
+    text: "Should finances be managed jointly?",
+    category: "Financial Compatibility",
+    dbCategory: "LIFESTYLE",
+    type: "SINGLE_CHOICE",
+    options: ["Yes", "No", "Partially"]
+  },
+  {
+    text: "How important is financial planning?",
+    category: "Financial Compatibility",
+    dbCategory: "LIFESTYLE",
+    type: "SINGLE_CHOICE",
+    options: ["Very important", "Important", "Moderate", "Not important"]
+  },
+  {
+    text: "What is your financial goal?",
+    category: "Financial Compatibility",
+    dbCategory: "LIFESTYLE",
+    type: "SINGLE_CHOICE",
+    options: ["Wealth creation", "Comfortable life", "Early retirement", "Business growth"]
+  },
+
+  // Category 7: Lifestyle Compatibility (LIFESTYLE)
+  {
+    text: "Food preference?",
+    category: "Lifestyle Compatibility",
+    dbCategory: "LIFESTYLE",
+    type: "SINGLE_CHOICE",
+    options: ["Vegetarian", "Eggetarian", "Non-vegetarian", "Vegan", "Jain"]
+  },
+  {
+    text: "Smoking habit?",
+    category: "Lifestyle Compatibility",
+    dbCategory: "LIFESTYLE",
+    type: "SINGLE_CHOICE",
+    options: ["Never", "Occasionally", "Regularly"]
+  },
+  {
+    text: "Drinking habit?",
+    category: "Lifestyle Compatibility",
+    dbCategory: "LIFESTYLE",
+    type: "SINGLE_CHOICE",
+    options: ["Never", "Socially", "Occasionally", "Regularly"]
+  },
+  {
+    text: "Weekend preference?",
+    category: "Lifestyle Compatibility",
+    dbCategory: "LIFESTYLE",
+    type: "SINGLE_CHOICE",
+    options: ["Home", "Family", "Travel", "Social gatherings"]
+  },
+  {
+    text: "Fitness importance?",
+    category: "Lifestyle Compatibility",
+    dbCategory: "LIFESTYLE",
+    type: "SINGLE_CHOICE",
+    options: ["Very important", "Important", "Moderate", "Not important"]
+  },
+
+  // Category 8: Personality Compatibility (PERSONALITY)
+  {
+    text: "Which describes you best?",
+    category: "Personality Compatibility",
+    dbCategory: "PERSONALITY",
+    type: "SINGLE_CHOICE",
+    options: ["Introvert", "Extrovert", "Ambivert"]
+  },
+  {
+    text: "How do you make important decisions?",
+    category: "Personality Compatibility",
+    dbCategory: "PERSONALITY",
+    type: "SINGLE_CHOICE",
+    options: ["Logic", "Emotions", "Both"]
+  },
+  {
+    text: "How adventurous are you?",
+    category: "Personality Compatibility",
+    dbCategory: "PERSONALITY",
+    type: "SINGLE_CHOICE",
+    options: ["Very adventurous", "Moderately adventurous", "Conservative"]
+  },
+  {
+    text: "How important is personal space?",
+    category: "Personality Compatibility",
+    dbCategory: "PERSONALITY",
+    type: "SINGLE_CHOICE",
+    options: ["Very important", "Important", "Moderate", "Not important"]
+  },
+
+  // Category 9: Future Goals Compatibility (FUN)
+  {
+    text: "Where would you like to settle?",
+    category: "Future Goals Compatibility",
+    dbCategory: "FUN",
+    type: "SINGLE_CHOICE",
+    options: ["Current city", "Metro city", "Abroad", "Flexible"]
+  },
+  {
+    text: "What are your top 3 life goals?",
+    category: "Future Goals Compatibility",
+    dbCategory: "FUN",
+    type: "LONG_TEXT",
+    options: []
+  },
+  {
+    text: "Describe your dream life after 10 years.",
+    category: "Future Goals Compatibility",
+    dbCategory: "FUN",
+    type: "LONG_TEXT",
+    options: []
+  },
+  {
+    text: "What kind of future family do you envision?",
+    category: "Future Goals Compatibility",
+    dbCategory: "FUN",
+    type: "LONG_TEXT",
+    options: []
+  },
+
+  // Category 10: AI Gold Questions (FUN)
+  {
+    text: "What values can never be compromised in your life?",
+    category: "AI Gold Questions",
+    dbCategory: "FUN",
+    type: "LONG_TEXT",
+    options: []
+  },
+  {
+    text: "Describe your ideal life partner.",
+    category: "AI Gold Questions",
+    dbCategory: "FUN",
+    type: "LONG_TEXT",
+    options: []
+  },
+  {
+    text: "What lessons have past relationships taught you?",
+    category: "AI Gold Questions",
+    dbCategory: "FUN",
+    type: "LONG_TEXT",
+    options: []
+  },
+  {
+    text: "How do you define love?",
+    category: "AI Gold Questions",
+    dbCategory: "FUN",
+    type: "LONG_TEXT",
+    options: []
+  },
+  {
+    text: "What kind of support do you expect from your spouse?",
+    category: "AI Gold Questions",
+    dbCategory: "FUN",
+    type: "LONG_TEXT",
+    options: []
+  },
+  {
+    text: "What kind of spouse do you want to become?",
+    category: "AI Gold Questions",
+    dbCategory: "FUN",
+    type: "LONG_TEXT",
+    options: []
+  },
+  {
+    text: "What would make you feel deeply understood in a marriage?",
+    category: "AI Gold Questions",
+    dbCategory: "FUN",
+    type: "LONG_TEXT",
+    options: []
+  },
+  {
+    text: "If your future partner reads this answer, what would you want them to know about you?",
+    category: "AI Gold Questions",
+    dbCategory: "FUN",
+    type: "LONG_TEXT",
+    options: []
+  }
+];
 
 async function main() {
-  console.log("🌱 Starting seed database...");
-
-  // 1. Clean up existing records in dependency order
-  console.log("🗑 Cleaning up existing data...");
+  console.log("🗑 Cleaning existing questions, answers, and business data in dependency order...");
   await prisma.profileAnswer.deleteMany({});
+  await prisma.questionOption.deleteMany({});
+  await prisma.question.deleteMany({});
+  
   await prisma.profilePersonal.deleteMany({});
   await prisma.agencyProfile.deleteMany({});
   await prisma.person.deleteMany({});
@@ -16,240 +345,44 @@ async function main() {
   await prisma.agencyUser.deleteMany({});
   await prisma.agency.deleteMany({});
 
-  // 2. Create Agency
-  console.log("🏢 Seeding Agency...");
-  const agency = await prisma.agency.create({
-    data: {
-      name: "MatriMitra Premier Matrimonial",
-      email: "info@matrimitra.com",
-      mobile: "+919876543210",
-      city: "Hyderabad",
-      state: "Telangana",
-      country: "India",
-      agencyCode: "MM-PREMIER-01",
-      status: "ACTIVE",
-    },
-  });
+  console.log("🌱 Seeding questions...");
+  for (const q of rawQuestions) {
+    const encodedText = JSON.stringify({
+      text: q.text,
+      category: q.category,
+      type: q.type
+    });
 
-  // 3. Create Agency Users
-  console.log("👥 Seeding Agency Users...");
-  const passwordHash = bcrypt.hashSync("MatriMitra@123", 10);
+    const createdQuestion = await prisma.question.create({
+      data: {
+        questionText: encodedText,
+        category: q.dbCategory as any,
+        isActive: true,
+      }
+    });
 
-  const owner = await prisma.agencyUser.create({
-    data: {
-      agencyId: agency.id,
-      username: "agency_owner",
-      email: "owner@matrimitra.com",
-      passwordHash,
-      firstName: "Rajesh",
-      lastName: "Kumar",
-      mobile: "+919876543211",
-      role: "OWNER",
-      status: "ACTIVE",
-    },
-  });
+    if (q.type === "SINGLE_CHOICE" && q.options.length > 0) {
+      for (const opt of q.options) {
+        await prisma.questionOption.create({
+          data: {
+            questionId: createdQuestion.id,
+            optionText: opt
+          }
+        });
+      }
+    } else {
+      await prisma.questionOption.create({
+        data: {
+          questionId: createdQuestion.id,
+          optionText: "TEXT_ANSWER"
+        }
+      });
+    }
+  }
 
-  const exec1 = await prisma.agencyUser.create({
-    data: {
-      agencyId: agency.id,
-      username: "executive_priya",
-      email: "priya@matrimitra.com",
-      passwordHash,
-      firstName: "Priya",
-      lastName: "Sharma",
-      mobile: "+919876543212",
-      role: "EXECUTIVE",
-      status: "ACTIVE",
-    },
-  });
-
-  const exec2 = await prisma.agencyUser.create({
-    data: {
-      agencyId: agency.id,
-      username: "executive_amit",
-      email: "amit@matrimitra.com",
-      passwordHash,
-      firstName: "Amit",
-      lastName: "Patel",
-      mobile: "+919876543213",
-      role: "EXECUTIVE",
-      status: "ACTIVE",
-    },
-  });
-
-  // 4. Create Clients
-  console.log("💼 Seeding Clients...");
-  const client1 = await prisma.client.create({
-    data: {
-      agencyId: agency.id,
-      clientCode: "CL-20260614-001",
-      firstName: "Harish",
-      lastName: "Rao",
-      email: "harish.rao@gmail.com",
-      mobile: "+919876543214",
-      address: "H.No. 12-4-56, Jubilee Hills, Hyderabad",
-      status: "ACTIVE",
-      leadSource: "REFERENCE",
-      assignedUserId: exec1.id,
-      nextFollowUpAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days later
-    },
-  });
-
-  const client2 = await prisma.client.create({
-    data: {
-      agencyId: agency.id,
-      clientCode: "CL-20260614-002",
-      firstName: "Sunitha",
-      lastName: "Reddy",
-      email: "sunitha.reddy@yahoo.com",
-      mobile: "+919876543215",
-      address: "Flat 402, Gachibowli, Hyderabad",
-      status: "LEAD",
-      leadSource: "WEBSITE",
-      assignedUserId: exec2.id,
-      nextFollowUpAt: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000), // 4 days later
-    },
-  });
-
-  // 5. Create Persons and Profiles
-  console.log("👤 Seeding Profiles...");
-  
-  // Person 1 (Son of Harish Rao)
-  const person1 = await prisma.person.create({
-    data: {
-      firstName: "Karthik",
-      lastName: "Rao",
-      gender: "MALE",
-      mobile: "+919876543216",
-      email: "karthik.rao@gmail.com",
-      dob: new Date("1996-05-15"),
-    },
-  });
-
-  const profile1 = await prisma.agencyProfile.create({
-    data: {
-      agencyId: agency.id,
-      personId: person1.id,
-      clientId: client1.id,
-      assignedUserId: exec1.id,
-      profileNumber: "MM-M-0001",
-      profileType: "SON",
-      status: "APPROVED",
-      completionPercent: 80,
-    },
-  });
-
-  await prisma.profilePersonal.create({
-    data: {
-      profileId: profile1.id,
-      religion: "Hindu",
-      caste: "Reddy",
-      motherTongue: "Telugu",
-      heightCm: 178,
-      weightKg: 74,
-      maritalStatus: "Never Married",
-      city: "Hyderabad",
-      state: "Telangana",
-      country: "India",
-    },
-  });
-
-  // Person 2 (Daughter of Sunitha Reddy)
-  const person2 = await prisma.person.create({
-    data: {
-      firstName: "Anjali",
-      lastName: "Reddy",
-      gender: "FEMALE",
-      mobile: "+919876543217",
-      email: "anjali.reddy@yahoo.com",
-      dob: new Date("1998-09-22"),
-    },
-  });
-
-  const profile2 = await prisma.agencyProfile.create({
-    data: {
-      agencyId: agency.id,
-      personId: person2.id,
-      clientId: client2.id,
-      assignedUserId: exec2.id,
-      profileNumber: "MM-F-0002",
-      profileType: "DAUGHTER",
-      status: "DRAFT",
-      completionPercent: 40,
-    },
-  });
-
-  await prisma.profilePersonal.create({
-    data: {
-      profileId: profile2.id,
-      religion: "Hindu",
-      caste: "Reddy",
-      motherTongue: "Telugu",
-      heightCm: 164,
-      weightKg: 58,
-      maritalStatus: "Never Married",
-      city: "Hyderabad",
-      state: "Telangana",
-      country: "India",
-    },
-  });
-
-  // 6. Create Notes
-  console.log("📝 Seeding Client Notes...");
-  await prisma.clientNote.create({
-    data: {
-      clientId: client1.id,
-      authorId: exec1.id,
-      content: "Called client Harish Rao. He is happy with the progress. Requested to share matching profiles for Karthik Rao.",
-      createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
-    },
-  });
-
-  await prisma.clientNote.create({
-    data: {
-      clientId: client2.id,
-      authorId: exec2.id,
-      content: "Sunitha Reddy submitted inquiry form. Wants to register her daughter Anjali. Scheduled initial consultation call.",
-      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-    },
-  });
-
-  // 7. Create Payments
-  console.log("💳 Seeding Client Payments...");
-  await prisma.payment.create({
-    data: {
-      clientId: client1.id,
-      agencyId: agency.id,
-      amount: 15000,
-      currency: "INR",
-      status: "COMPLETED",
-      paymentMethod: "UPI",
-      transactionId: "TXN123456789",
-      remarks: "Registration & first installment payment received.",
-      createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
-    },
-  });
-
-  await prisma.payment.create({
-    data: {
-      clientId: client2.id,
-      agencyId: agency.id,
-      amount: 15000,
-      currency: "INR",
-      status: "PENDING",
-      remarks: "Invoice sent for package registration.",
-      createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000), // 12 hours ago
-    },
-  });
-
-  console.log("✅ Seed database completed successfully!");
+  console.log(`✅ Seeded ${rawQuestions.length} questions successfully!`);
 }
 
 main()
-  .catch((e) => {
-    console.error("❌ Seed database failed:", e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .catch(console.error)
+  .finally(() => prisma.$disconnect());

@@ -48,8 +48,8 @@ export const ProfileService = {
     const response = await api.put(`/profiles/${id}`, data);
     return response.data;
   },
-  async updateStatus(id: string, status: string) {
-    const response = await api.patch(`/profiles/${id}/status`, { status });
+  async updateStatus(id: string, status: string, reason?: string) {
+    const response = await api.patch(`/profiles/${id}/status`, { status, reason });
     return response.data;
   },
   async logAccess(id: string, action: string) {

@@ -229,6 +229,31 @@ function generateTraitBasedExplanations(tTraits: any, cTraits: any, score: numbe
   return { strengths, concerns };
 }
 
+function normalizeTraits(traitsObj: any): any {
+  if (!traitsObj) return null;
+  const result = { ...traitsObj };
+  const keys = [
+    "communicationScore", "familyScore", "careerScore", "financialScore", 
+    "lifestyleScore", "emotionalScore", "traditionalScore", "parentingScore", "independenceScore"
+  ];
+  for (const key of keys) {
+    if (result[key] !== null && result[key] !== undefined && result[key] > 10) {
+      result[key] = Math.round((result[key] / 10) * 10) / 10;
+    }
+  }
+  return result;
+}
+
+function isEssayQuestion(question: any, optionText: string): boolean {
+  if (optionText === "TEXT_ANSWER") return true;
+  if (!question?.questionText) return false;
+  try {
+    const parsed = JSON.parse(question.questionText);
+    if (parsed.type === "LONG_TEXT") return true;
+  } catch {}
+  return false;
+}
+
 export class MatchService {
   private repository: MatchRepository;
   private traitService: TraitService;
@@ -248,7 +273,8 @@ export class MatchService {
     }
 
     // Fetch or generate target traits deterministically if missing
-    const targetTraits = await this.traitService.getOrGenerateTraits(profileId, targetProfile);
+    const rawTargetTraits = await this.traitService.getOrGenerateTraits(profileId, targetProfile);
+    const targetTraits = normalizeTraits(rawTargetTraits);
 
     const targetPref = targetProfile.preferences[0];
     const targetAnswers = targetProfile.answers;
@@ -314,6 +340,10 @@ export class MatchService {
       for (const targetAns of targetAnswers) {
         if (targetAns.importance === "MUST_HAVE") {
           const qText = targetAns.question?.questionText?.toLowerCase() || "";
+          const optText = targetAns.selectedOption?.optionText || "";
+          if (isEssayQuestion(targetAns.question, optText)) {
+            continue;
+          }
           
           const isSmokingDB = qText.includes("smoking");
           const isDrinkingDB = qText.includes("drinking");
@@ -455,10 +485,10 @@ export class MatchService {
       }
 
       // Mutual preference score calculation (average of both directions)
-      const sourceToTargetScorePercent = sourceToTargetRes.maxScore > 0 ? (sourceToTargetRes.score / sourceToTargetRes.maxScore) * 100 : 100;
-      const targetToSourceScorePercent = targetToSourceRes.maxScore > 0 ? (targetToSourceRes.score / targetToSourceRes.maxScore) * 100 : 100;
+      const sourceToTargetScorePercent = Math.max(0, Math.min(100, sourceToTargetRes.maxScore > 0 ? (sourceToTargetRes.score / sourceToTargetRes.maxScore) * 100 : 100));
+      const targetToSourceScorePercent = Math.max(0, Math.min(100, targetToSourceRes.maxScore > 0 ? (targetToSourceRes.score / targetToSourceRes.maxScore) * 100 : 100));
       
-      const filterScorePercent = Math.round((sourceToTargetScorePercent + targetToSourceScorePercent) / 2);
+      const filterScorePercent = Math.max(0, Math.min(100, Math.round((sourceToTargetScorePercent + targetToSourceScorePercent) / 2)));
       const weightedFilterScore = filterScorePercent * 0.4;
 
       // ==========================================
@@ -466,13 +496,14 @@ export class MatchService {
       // ==========================================
 
       // Confidence score based on candidate questionnaire completion rate
-      const confidenceScore = Math.round((candidate.answers.length / totalQuestions) * 100);
+      const confidenceScore = Math.max(0, Math.min(100, Math.round((candidate.answers.length / totalQuestions) * 100)));
 
       // Fetch or generate candidate traits (deterministic fallback if missing)
-      let candidateTraits = candidateTraitsList.find(t => t.profileId === candidate.id);
-      if (!candidateTraits) {
-        candidateTraits = await this.traitService.getOrGenerateTraits(candidate.id, candidate);
+      let rawCandidateTraits = candidateTraitsList.find(t => t.profileId === candidate.id);
+      if (!rawCandidateTraits) {
+        rawCandidateTraits = await this.traitService.getOrGenerateTraits(candidate.id, candidate);
       }
+      const candidateTraits = normalizeTraits(rawCandidateTraits);
 
       // Compare Questionnaire via traits (exclude unanswered traits containing null)
       let traitMatchSum = 0;
@@ -490,15 +521,16 @@ export class MatchService {
           activeTraitCount++;
         }
       }
-      const questionnaireScorePercent = activeTraitCount > 0 ? Math.round(traitMatchSum / activeTraitCount) : 50;
+      const questionnaireScorePercent = Math.max(0, Math.min(100, activeTraitCount > 0 ? Math.round(traitMatchSum / activeTraitCount) : 50));
       const weightedQuestScore = questionnaireScorePercent * 0.4;
 
       // 3. Lifestyle Score (10%)
-      const lifestyleScorePercent = calculateLifestyleScore(targetProfile, candidate);
+      const lifestyleScorePercent = Math.max(0, Math.min(100, calculateLifestyleScore(targetProfile, candidate)));
       const weightedLifestyleScore = lifestyleScorePercent * 0.1;
 
       // 4. Education/Career Score (10%)
-      const educationCareerScorePercent = calculateEducationCareerScore(targetProfile, candidate);
+      const rawEduCareer = calculateEducationCareerScore(targetProfile, candidate);
+      const educationCareerScorePercent = rawEduCareer !== null ? Math.max(0, Math.min(100, rawEduCareer)) : null;
       
       let finalScore = 0;
       if (educationCareerScorePercent === null) {
@@ -506,13 +538,13 @@ export class MatchService {
         const rawFinalScore = Math.round(
           (weightedFilterScore + weightedQuestScore + weightedLifestyleScore) / 0.9
         );
-        finalScore = Math.min(95, rawFinalScore);
+        finalScore = Math.max(0, Math.min(95, rawFinalScore));
       } else {
         const weightedEduCareerScore = educationCareerScorePercent * 0.1;
         const rawFinalScore = Math.round(
           weightedFilterScore + weightedQuestScore + weightedLifestyleScore + weightedEduCareerScore
         );
-        finalScore = Math.min(95, rawFinalScore);
+        finalScore = Math.max(0, Math.min(95, rawFinalScore));
       }
 
       // Strengths & Concerns Explanation Generation from Traits (Deterministic first)
@@ -692,8 +724,10 @@ export class MatchService {
     }
 
     // Load or generate traits for both target and candidate to run on-demand explanation
-    const targetTraits = await this.traitService.getOrGenerateTraits(profileId, targetProfile);
-    const candidateTraits = await this.traitService.getOrGenerateTraits(candidateId, candidate);
+    const rawTargetTraits = await this.traitService.getOrGenerateTraits(profileId, targetProfile);
+    const rawCandidateTraits = await this.traitService.getOrGenerateTraits(candidateId, candidate);
+    const targetTraits = normalizeTraits(rawTargetTraits);
+    const candidateTraits = normalizeTraits(rawCandidateTraits);
 
     // Generate detailed dynamic AI explanation on-demand
     let detailedExplanation = compat.aiExplanation || "";

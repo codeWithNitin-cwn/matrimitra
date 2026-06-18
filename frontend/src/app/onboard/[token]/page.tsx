@@ -21,6 +21,32 @@ export default function PublicOnboardingPage() {
   const [rejectReason, setRejectReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Edit states
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    gender: '',
+    dob: '',
+    mobile: '',
+    email: '',
+    religion: '',
+    caste: '',
+    subCaste: '',
+    motherTongue: '',
+    maritalStatus: '',
+    height: '',
+    weightKg: '',
+    degree: '',
+    college: '',
+    specialization: '',
+    graduationYear: '',
+    occupation: '',
+    company: '',
+    salary: '',
+    designation: '',
+    workLocation: '',
+  });
+
   useEffect(() => {
     if (token) {
       fetchProfile();
@@ -85,6 +111,63 @@ export default function PublicOnboardingPage() {
     }
   };
 
+  const startEditing = () => {
+    if (!profile) return;
+    const edu = profile.educations?.[0] || {};
+    const car = profile.careers?.[0] || {};
+    const personal = profile.personal || {};
+    setFormData({
+      name: `${profile.person?.firstName || ''} ${profile.person?.lastName || ''}`.trim(),
+      gender: profile.person?.gender || '',
+      dob: profile.person?.dob ? new Date(profile.person.dob).toISOString().split('T')[0] : '',
+      mobile: profile.person?.mobile || '',
+      email: profile.person?.email || '',
+      religion: personal.religion || '',
+      caste: personal.caste || '',
+      subCaste: personal.subCaste || '',
+      motherTongue: personal.motherTongue || '',
+      maritalStatus: personal.maritalStatus || '',
+      height: personal.heightCm ? String(personal.heightCm) : '',
+      weightKg: personal.weightKg ? String(personal.weightKg) : '',
+      degree: edu.qualification || '',
+      college: edu.institution || '',
+      specialization: edu.specialization || '',
+      graduationYear: edu.graduationYear ? String(edu.graduationYear) : '',
+      occupation: car.profession || '',
+      company: car.employer || '',
+      salary: car.annualIncome ? String(car.annualIncome) : '',
+      designation: car.designation || '',
+      workLocation: car.workLocation || '',
+    });
+    setIsEditing(true);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setSubmitting(true);
+      setStatusMsg(null);
+      const res = await axios.put(`${API_BASE}/public-onboarding/${token}`, formData);
+      if (res.data?.success) {
+        setStatusMsg({ type: 'success', text: 'Your profile changes have been submitted successfully! The agency will review and approve.' });
+        setIsEditing(false);
+        fetchProfile();
+      }
+    } catch (err: any) {
+      setStatusMsg({ type: 'error', text: err.response?.data?.error?.message || 'Failed to submit changes.' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-900 text-white flex flex-col justify-center items-center">
@@ -130,220 +213,393 @@ export default function PublicOnboardingPage() {
         )}
 
         {/* Info Box */}
-        {profile?.clientApproved && (
+        {profile?.status === 'ACTIVE' && (
           <div className="mb-8 p-4 bg-emerald-950/30 border border-emerald-900/50 rounded-xl flex items-center gap-3 text-emerald-400">
             <CheckIcon className="h-5 w-5 shrink-0" />
-            <span className="text-sm font-medium">You have approved this profile. Status: <strong className="text-emerald-300 uppercase">{profile.status}</strong></span>
+            <span className="text-sm font-medium">Your profile is <strong>ACTIVE</strong> and verified.</span>
           </div>
         )}
 
-        {profile?.clientRejectedReason && !profile?.clientApproved && (
-          <div className="mb-8 p-4 bg-amber-950/30 border border-amber-900/50 rounded-xl">
-            <span className="text-sm font-semibold text-amber-400 block mb-1">Your requested revisions:</span>
-            <p className="text-xs text-amber-300 italic">"{profile.clientRejectedReason}"</p>
+        {profile?.status === 'CLIENT_UPDATED' && (
+          <div className="mb-8 p-4 bg-indigo-950/30 border border-indigo-900/50 rounded-xl flex items-center gap-3 text-indigo-400">
+            <div className="h-2 w-2 rounded-full bg-indigo-400 animate-pulse shrink-0" />
+            <span className="text-sm font-medium">Changes submitted successfully. Awaiting final agency review and approval.</span>
           </div>
         )}
 
-        {/* Profile Details Grid */}
-        <div className="bg-slate-900/50 backdrop-blur-md rounded-3xl border border-slate-800 shadow-xl overflow-hidden p-6 sm:p-8 space-y-8 mb-8">
-          
-          {/* Section: Basic Info */}
-          <div>
-            <h2 className="text-lg font-bold text-white mb-4 border-b border-slate-800 pb-2">Personal Information</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
-              <div>
-                <span className="text-slate-400 block text-xs">Full Name</span>
-                <span className="text-white font-medium">{profile.person?.firstName} {profile.person?.lastName || ''}</span>
-              </div>
-              <div>
-                <span className="text-slate-400 block text-xs">Gender</span>
-                <span className="text-white font-medium capitalize">{profile.person?.gender || 'N/A'}</span>
-              </div>
-              <div>
-                <span className="text-slate-400 block text-xs">Relationship to Client</span>
-                <span className="text-white font-medium">{profile.relationshipToClient || 'Self'}</span>
-              </div>
-              <div>
-                <span className="text-slate-400 block text-xs">Profile Type</span>
-                <span className="text-white font-medium">{profile.profileType}</span>
-              </div>
-              <div>
-                <span className="text-slate-400 block text-xs">Religion / Caste</span>
-                <span className="text-white font-medium">
-                  {profile.personal?.religion || 'N/A'} {profile.personal?.caste ? `- ${profile.personal.caste}` : ''}
-                </span>
-              </div>
-              <div>
-                <span className="text-slate-400 block text-xs">Mother Tongue</span>
-                <span className="text-white font-medium">{profile.personal?.motherTongue || 'N/A'}</span>
-              </div>
-              <div>
-                <span className="text-slate-400 block text-xs">Marital Status</span>
-                <span className="text-white font-medium">{profile.personal?.maritalStatus || 'N/A'}</span>
-              </div>
-              <div>
-                <span className="text-slate-400 block text-xs">Height / Weight</span>
-                <span className="text-white font-medium">
-                  {profile.personal?.heightCm ? `${profile.personal.heightCm} cm` : 'N/A'} 
-                  {profile.personal?.weightKg ? ` / ${profile.personal.weightKg} kg` : ''}
-                </span>
-              </div>
-              <div>
-                <span className="text-slate-400 block text-xs">Current Location</span>
-                <span className="text-white font-medium">
-                  {profile.personal?.city || 'N/A'}{profile.personal?.state ? `, ${profile.personal.state}` : ''}
-                </span>
+        {profile?.status === 'PENDING' && (
+          <div className="mb-8 p-4 bg-amber-950/30 border border-amber-900/50 rounded-xl flex items-center gap-3 text-amber-400">
+            <CheckIcon className="h-5 w-5 shrink-0" />
+            <span className="text-sm font-medium">Profile approved! Awaiting final agency activation.</span>
+          </div>
+        )}
+
+        {profile?.status === 'CORRECTION_REQUESTED' && (
+          <div className="mb-8 p-4 bg-rose-950/30 border border-rose-900/50 rounded-xl flex items-center gap-3 text-rose-400">
+            <span className="text-sm font-medium">Revisions requested: <strong className="italic text-rose-300">"{profile.clientRejectedReason || 'None'}"</strong></span>
+          </div>
+        )}
+
+        {isEditing ? (
+          <form onSubmit={handleEditSubmit} className="bg-slate-900/50 backdrop-blur-md rounded-3xl border border-slate-800 shadow-xl p-6 sm:p-8 space-y-8 mb-8">
+            {/* Section 1: Personal Info */}
+            <div>
+              <h2 className="text-lg font-bold text-white mb-4 border-b border-slate-800 pb-2">Personal Information</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
+                <div>
+                  <label className="text-slate-400 block text-xs mb-1">Full Name</label>
+                  <input type="text" name="name" value={formData.name} onChange={handleInputChange} required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div>
+                  <label className="text-slate-400 block text-xs mb-1">Gender</label>
+                  <select name="gender" value={formData.gender} onChange={handleInputChange} required className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="">Select Gender</option>
+                    <option value="MALE">Male</option>
+                    <option value="FEMALE">Female</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-slate-400 block text-xs mb-1">Date of Birth</label>
+                  <input type="date" name="dob" value={formData.dob} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div>
+                  <label className="text-slate-400 block text-xs mb-1">Mobile</label>
+                  <input type="text" name="mobile" value={formData.mobile} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div>
+                  <label className="text-slate-400 block text-xs mb-1">Email</label>
+                  <input type="email" name="email" value={formData.email} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div>
+                  <label className="text-slate-400 block text-xs mb-1">Religion</label>
+                  <input type="text" name="religion" value={formData.religion} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div>
+                  <label className="text-slate-400 block text-xs mb-1">Caste</label>
+                  <input type="text" name="caste" value={formData.caste} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div>
+                  <label className="text-slate-400 block text-xs mb-1">Sub Caste</label>
+                  <input type="text" name="subCaste" value={formData.subCaste} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div>
+                  <label className="text-slate-400 block text-xs mb-1">Mother Tongue</label>
+                  <input type="text" name="motherTongue" value={formData.motherTongue} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div>
+                  <label className="text-slate-400 block text-xs mb-1">Marital Status</label>
+                  <input type="text" name="maritalStatus" value={formData.maritalStatus} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div>
+                  <label className="text-slate-400 block text-xs mb-1">Height (cm)</label>
+                  <input type="number" name="height" value={formData.height} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div>
+                  <label className="text-slate-400 block text-xs mb-1">Weight (kg)</label>
+                  <input type="number" name="weightKg" value={formData.weightKg} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Section: Education & Career */}
-          <div>
-            <h2 className="text-lg font-bold text-white mb-4 border-b border-slate-800 pb-2">Education & Career</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
-              <div>
-                <h3 className="font-semibold text-slate-300 text-xs mb-2">Education Details</h3>
-                {profile.educations && profile.educations.length > 0 ? (
-                  profile.educations.map((edu: any, idx: number) => (
-                    <div key={idx} className="bg-slate-800/40 p-3 rounded-lg border border-slate-800 mb-2">
-                      <div className="font-medium text-white">{edu.qualification}</div>
-                      {edu.specialization && <div className="text-slate-400 text-xs">{edu.specialization}</div>}
-                      {edu.institution && <div className="text-slate-500 text-xs">{edu.institution}</div>}
-                    </div>
-                  ))
-                ) : (
-                  <span className="text-slate-500 text-xs italic">No education history added.</span>
-                )}
-              </div>
-              <div>
-                <h3 className="font-semibold text-slate-300 text-xs mb-2">Career Details</h3>
-                {profile.careers && profile.careers.length > 0 ? (
-                  profile.careers.map((car: any, idx: number) => (
-                    <div key={idx} className="bg-slate-800/40 p-3 rounded-lg border border-slate-800 mb-2">
-                      <div className="font-medium text-white">{car.profession || 'N/A'}</div>
-                      {(car.employer || car.designation) && (
-                        <div className="text-slate-400 text-xs">{car.designation || ''} {car.employer ? `@ ${car.employer}` : ''}</div>
-                      )}
-                      {car.annualIncome && <div className="text-emerald-400 text-xs">Annual Income: {Number(car.annualIncome).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</div>}
-                    </div>
-                  ))
-                ) : (
-                  <span className="text-slate-500 text-xs italic">No career history added.</span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Section: Family */}
-          <div>
-            <h2 className="text-lg font-bold text-white mb-4 border-b border-slate-800 pb-2">Family Details</h2>
-            {profile.families && profile.families.length > 0 ? (
+            {/* Section 2: Education & Career */}
+            <div>
+              <h2 className="text-lg font-bold text-white mb-4 border-b border-slate-800 pb-2">Education & Career</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
-                {profile.families.map((fam: any, idx: number) => (
-                  <React.Fragment key={idx}>
-                    <div>
-                      <span className="text-slate-400 block text-xs">Father's Name & Occupation</span>
-                      <span className="text-white font-medium block">{fam.fatherName || 'N/A'}</span>
-                      {fam.fatherOccupation && <span className="text-xs text-slate-500">{fam.fatherOccupation}</span>}
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-xs">Mother's Name & Occupation</span>
-                      <span className="text-white font-medium block">{fam.motherName || 'N/A'}</span>
-                      {fam.motherOccupation && <span className="text-xs text-slate-500">{fam.motherOccupation}</span>}
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-xs">Family Values / Type</span>
-                      <span className="text-white font-medium">{fam.familyValues || 'N/A'} ({fam.familyType || 'N/A'})</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-xs">Siblings</span>
-                      <span className="text-white font-medium">{fam.siblingsCount !== null ? `${fam.siblingsCount} siblings` : 'N/A'}</span>
-                    </div>
-                  </React.Fragment>
-                ))}
-              </div>
-            ) : (
-              <span className="text-slate-500 text-xs italic">No family details added.</span>
-            )}
-          </div>
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-slate-300 text-xs uppercase tracking-wider">Education</h3>
+                  <div>
+                    <label className="text-slate-400 block text-xs mb-1">Degree / Qualification</label>
+                    <input type="text" name="degree" value={formData.degree} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block text-xs mb-1">Institution / College</label>
+                    <input type="text" name="college" value={formData.college} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block text-xs mb-1">Specialization</label>
+                    <input type="text" name="specialization" value={formData.specialization} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block text-xs mb-1">Graduation Year</label>
+                    <input type="number" name="graduationYear" value={formData.graduationYear} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                </div>
 
-          {/* Section: Lifestyle */}
-          <div>
-            <h2 className="text-lg font-bold text-white mb-4 border-b border-slate-800 pb-2">Lifestyle</h2>
-            {profile.lifestyles && profile.lifestyles.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-sm">
-                {profile.lifestyles.map((life: any, idx: number) => (
-                  <React.Fragment key={idx}>
-                    <div>
-                      <span className="text-slate-400 block text-xs">Food Habit</span>
-                      <span className="text-white font-medium capitalize">{life.foodHabit || 'N/A'}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-xs">Smoking</span>
-                      <span className="text-white font-medium">{life.smoking === true ? 'Yes' : life.smoking === false ? 'No' : 'N/A'}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-xs">Drinking</span>
-                      <span className="text-white font-medium">{life.drinking === true ? 'Yes' : life.drinking === false ? 'No' : 'N/A'}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-xs">Fitness Level</span>
-                      <span className="text-white font-medium">{life.fitnessLevel || 'N/A'}</span>
-                    </div>
-                  </React.Fragment>
-                ))}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-slate-300 text-xs uppercase tracking-wider">Career</h3>
+                  <div>
+                    <label className="text-slate-400 block text-xs mb-1">Occupation / Profession</label>
+                    <input type="text" name="occupation" value={formData.occupation} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block text-xs mb-1">Employer / Company</label>
+                    <input type="text" name="company" value={formData.company} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block text-xs mb-1">Designation</label>
+                    <input type="text" name="designation" value={formData.designation} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block text-xs mb-1">Annual Income (INR)</label>
+                    <input type="number" name="salary" value={formData.salary} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block text-xs mb-1">Work Location</label>
+                    <input type="text" name="workLocation" value={formData.workLocation} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  </div>
+                </div>
               </div>
-            ) : (
-              <span className="text-slate-500 text-xs italic">No lifestyle details added.</span>
-            )}
-          </div>
+            </div>
 
-          {/* Section: Photos */}
-          <div>
-            <h2 className="text-lg font-bold text-white mb-4 border-b border-slate-800 pb-2">Profile Photos</h2>
-            {profile.photos && profile.photos.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {profile.photos.map((photo: any) => (
-                  <div key={photo.id} className="relative aspect-[3/4] bg-slate-800 rounded-xl overflow-hidden border border-slate-700 shadow-sm">
-                    <img
-                      src={photo.cloudinaryUrl}
-                      alt="Candidate Profile"
-                      className="object-cover w-full h-full"
-                    />
-                    {photo.isPrimary && (
-                      <span className="absolute bottom-2 left-2 bg-indigo-600 text-white text-[9px] font-bold px-2 py-0.5 rounded shadow">
-                        Primary Photo
-                      </span>
+            {/* Form Actions */}
+            <div className="flex justify-end gap-x-4 border-t border-slate-800 pt-6">
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                disabled={submitting}
+                className="px-5 py-2.5 border border-slate-800 rounded-xl text-sm font-semibold text-slate-400 hover:bg-slate-850 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-6 py-2.5 bg-indigo-650 hover:bg-indigo-600 rounded-xl text-sm font-semibold text-white transition shadow-lg shadow-indigo-650/20"
+              >
+                {submitting ? 'Submitting...' : 'Submit Changes'}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <>
+            {/* Profile Details Grid */}
+            <div className="bg-slate-900/50 backdrop-blur-md rounded-3xl border border-slate-800 shadow-xl overflow-hidden p-6 sm:p-8 space-y-8 mb-8">
+              
+              {/* Section: Basic Info */}
+              <div>
+                <h2 className="text-lg font-bold text-white mb-4 border-b border-slate-800 pb-2">Personal Information</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
+                  <div>
+                    <span className="text-slate-400 block text-xs">Full Name</span>
+                    <span className="text-white font-medium">{profile.person?.firstName} {profile.person?.lastName || ''}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-xs">Gender</span>
+                    <span className="text-white font-medium capitalize">{profile.person?.gender || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-xs">Relationship to Client</span>
+                    <span className="text-white font-medium">{profile.relationshipToClient || 'Self'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-xs">Profile Type</span>
+                    <span className="text-white font-medium">{profile.profileType}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-xs">Religion / Caste</span>
+                    <span className="text-white font-medium">
+                      {profile.personal?.religion || 'N/A'} {profile.personal?.caste ? `- ${profile.personal.caste}` : ''}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-xs">Mother Tongue</span>
+                    <span className="text-white font-medium">{profile.personal?.motherTongue || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-xs">Marital Status</span>
+                    <span className="text-white font-medium">{profile.personal?.maritalStatus || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-xs">Height / Weight</span>
+                    <span className="text-white font-medium">
+                      {profile.personal?.heightCm ? `${profile.personal.heightCm} cm` : 'N/A'} 
+                      {profile.personal?.weightKg ? ` / ${profile.personal.weightKg} kg` : ''}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-xs">Current Location</span>
+                    <span className="text-white font-medium">
+                      {profile.personal?.city || 'N/A'}{profile.personal?.state ? `, ${profile.personal.state}` : ''}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section: Education & Career */}
+              <div>
+                <h2 className="text-lg font-bold text-white mb-4 border-b border-slate-800 pb-2">Education & Career</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
+                  <div>
+                    <h3 className="font-semibold text-slate-300 text-xs mb-2">Education Details</h3>
+                    {profile.educations && profile.educations.length > 0 ? (
+                      profile.educations.map((edu: any, idx: number) => (
+                        <div key={idx} className="bg-slate-800/40 p-3 rounded-lg border border-slate-800 mb-2">
+                          <div className="font-medium text-white">{edu.qualification}</div>
+                          {edu.specialization && <div className="text-slate-400 text-xs">{edu.specialization}</div>}
+                          {edu.institution && <div className="text-slate-500 text-xs">{edu.institution}</div>}
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-500 text-xs italic">No education history added.</span>
                     )}
                   </div>
-                ))}
+                  <div>
+                    <h3 className="font-semibold text-slate-300 text-xs mb-2">Career Details</h3>
+                    {profile.careers && profile.careers.length > 0 ? (
+                      profile.careers.map((car: any, idx: number) => (
+                        <div key={idx} className="bg-slate-800/40 p-3 rounded-lg border border-slate-800 mb-2">
+                          <div className="font-medium text-white">{car.profession || 'N/A'}</div>
+                          {(car.employer || car.designation) && (
+                            <div className="text-slate-400 text-xs">{car.designation || ''} {car.employer ? `@ ${car.employer}` : ''}</div>
+                          )}
+                          {car.annualIncome && <div className="text-emerald-400 text-xs">Annual Income: {Number(car.annualIncome).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</div>}
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-slate-500 text-xs italic">No career history added.</span>
+                    )}
+                  </div>
+                </div>
               </div>
-            ) : (
-              <span className="text-slate-500 text-xs italic">No photos added.</span>
-            )}
-          </div>
-        </div>
 
-        {/* Buttons Action bar */}
-        {!profile?.clientApproved && (
-          <div className="flex justify-end gap-x-4">
-            <button
-              onClick={() => setShowRejectModal(true)}
-              disabled={submitting}
-              className="inline-flex items-center gap-x-1.5 rounded-xl border border-slate-700 bg-transparent px-5 py-3 text-sm font-semibold text-slate-300 hover:bg-slate-900 transition disabled:opacity-50"
-            >
-              <XMarkIcon className="h-4 w-4" />
-              Request Corrections
-            </button>
-            <button
-              onClick={handleApprove}
-              disabled={submitting}
-              className="inline-flex items-center gap-x-1.5 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-500 transition shadow-lg shadow-indigo-650/20 disabled:opacity-50"
-            >
-              <CheckIcon className="h-4 w-4" />
-              Approve Profile
-            </button>
-          </div>
+              {/* Section: Family */}
+              <div>
+                <h2 className="text-lg font-bold text-white mb-4 border-b border-slate-800 pb-2">Family Details</h2>
+                {profile.families && profile.families.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
+                    {profile.families.map((fam: any, idx: number) => (
+                      <React.Fragment key={idx}>
+                        <div>
+                          <span className="text-slate-400 block text-xs">Father's Name & Occupation</span>
+                          <span className="text-white font-medium block">{fam.fatherName || 'N/A'}</span>
+                          {fam.fatherOccupation && <span className="text-xs text-slate-500">{fam.fatherOccupation}</span>}
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block text-xs">Mother's Name & Occupation</span>
+                          <span className="text-white font-medium block">{fam.motherName || 'N/A'}</span>
+                          {fam.motherOccupation && <span className="text-xs text-slate-500">{fam.motherOccupation}</span>}
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block text-xs">Family Values / Type</span>
+                          <span className="text-white font-medium">{fam.familyValues || 'N/A'} ({fam.familyType || 'N/A'})</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block text-xs">Siblings</span>
+                          <span className="text-white font-medium">{fam.siblingsCount !== null ? `${fam.siblingsCount} siblings` : 'N/A'}</span>
+                        </div>
+                      </React.Fragment>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-slate-500 text-xs italic">No family details added.</span>
+                )}
+              </div>
+
+              {/* Section: Lifestyle */}
+              <div>
+                <h2 className="text-lg font-bold text-white mb-4 border-b border-slate-800 pb-2">Lifestyle</h2>
+                {profile.lifestyles && profile.lifestyles.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-sm">
+                    {profile.lifestyles.map((life: any, idx: number) => (
+                      <React.Fragment key={idx}>
+                        <div>
+                          <span className="text-slate-400 block text-xs">Food Habit</span>
+                          <span className="text-white font-medium capitalize">{life.foodHabit || 'N/A'}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block text-xs">Smoking</span>
+                          <span className="text-white font-medium">{life.smoking === true ? 'Yes' : life.smoking === false ? 'No' : 'N/A'}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block text-xs">Drinking</span>
+                          <span className="text-white font-medium">{life.drinking === true ? 'Yes' : life.drinking === false ? 'No' : 'N/A'}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block text-xs">Fitness Level</span>
+                          <span className="text-white font-medium">{life.fitnessLevel || 'N/A'}</span>
+                        </div>
+                      </React.Fragment>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-slate-500 text-xs italic">No lifestyle details added.</span>
+                )}
+              </div>
+
+              {/* Section: Photos */}
+              <div>
+                <h2 className="text-lg font-bold text-white mb-4 border-b border-slate-800 pb-2">Profile Photos</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {(!profile.photos || profile.photos.length === 0 || (profile.photos.length === 1 && (!profile.photos[0].cloudinaryUrl || profile.photos[0].cloudinaryUrl === 'mock_photo_primary.png' || !profile.photos[0].cloudinaryUrl.startsWith('http')))) ? (
+                    <div className="relative aspect-[3/4] bg-slate-800 rounded-xl overflow-hidden border border-slate-700 shadow-sm">
+                      <img
+                        src={profile.person?.gender?.toUpperCase() === 'FEMALE'
+                          ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+                          : 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'}
+                        alt="Candidate Profile"
+                        className="object-cover w-full h-full"
+                      />
+                      <span className="absolute bottom-2 left-2 bg-indigo-600 text-white text-[9px] font-bold px-2 py-0.5 rounded shadow">
+                        Primary Avatar
+                      </span>
+                    </div>
+                  ) : (
+                    profile.photos.map((photo: any) => (
+                      <div key={photo.id} className="relative aspect-[3/4] bg-slate-800 rounded-xl overflow-hidden border border-slate-700 shadow-sm">
+                        <img
+                          src={(!photo.cloudinaryUrl || photo.cloudinaryUrl === 'mock_photo_primary.png' || !photo.cloudinaryUrl.startsWith('http'))
+                            ? (profile.person?.gender?.toUpperCase() === 'FEMALE'
+                                ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+                                : 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80')
+                            : photo.cloudinaryUrl}
+                          alt="Candidate Profile"
+                          className="object-cover w-full h-full"
+                        />
+                        {photo.isPrimary && (
+                          <span className="absolute bottom-2 left-2 bg-indigo-650 text-white text-[9px] font-bold px-2 py-0.5 rounded shadow">
+                            Primary Photo
+                          </span>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Buttons Action bar */}
+            {profile?.status !== 'ACTIVE' && (
+              <div className="flex justify-end gap-x-4">
+                {profile?.status !== 'CLIENT_UPDATED' && profile?.status !== 'PENDING' && (
+                  <button
+                    onClick={() => setShowRejectModal(true)}
+                    disabled={submitting}
+                    className="inline-flex items-center gap-x-1.5 rounded-xl border border-slate-700 bg-transparent px-5 py-3 text-sm font-semibold text-slate-300 hover:bg-slate-900 transition disabled:opacity-50"
+                  >
+                    <XMarkIcon className="h-4 w-4" />
+                    Request Corrections
+                  </button>
+                )}
+                <button
+                  onClick={startEditing}
+                  disabled={submitting}
+                  className="inline-flex items-center gap-x-1.5 rounded-xl border border-slate-750 bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition disabled:opacity-50"
+                >
+                  Edit Profile
+                </button>
+                {profile?.status !== 'CLIENT_UPDATED' && profile?.status !== 'PENDING' && (
+                  <button
+                    onClick={handleApprove}
+                    disabled={submitting}
+                    className="inline-flex items-center gap-x-1.5 rounded-xl bg-indigo-650 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-600 transition shadow-lg shadow-indigo-650/20 disabled:opacity-50"
+                  >
+                    <CheckIcon className="h-4 w-4" />
+                    Approve Profile
+                  </button>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
 

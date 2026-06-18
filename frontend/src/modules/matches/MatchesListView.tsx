@@ -249,10 +249,15 @@ export default function MatchesListView() {
                               <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
                                 match.finalScore >= 90 ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
                                 match.finalScore >= 80 ? 'bg-green-100 text-green-800' :
-                                match.finalScore >= 65 ? 'bg-blue-100 text-blue-800' :
-                                'bg-yellow-100 text-yellow-805'
+                                match.finalScore >= 60 ? 'bg-blue-100 text-blue-800' :
+                                match.finalScore >= 45 ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-red-100 text-red-805'
                               }`}>
-                                {match.finalScore >= 90 ? 'Exceptional' : match.finalScore >= 80 ? 'Strong' : 'Good'} ({match.finalScore}%)
+                                {match.finalScore >= 90 ? 'Exceptional' : 
+                                 match.finalScore >= 80 ? 'Strong' : 
+                                 match.finalScore >= 60 ? 'Good' : 
+                                 match.finalScore >= 45 ? 'Fair' : 
+                                 'Low Match'} ({match.finalScore}%)
                               </span>
                             </div>
                           </div>
@@ -347,10 +352,15 @@ export default function MatchesListView() {
                               <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
                                 match.finalScore >= 90 ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
                                 match.finalScore >= 80 ? 'bg-green-100 text-green-800' :
-                                match.finalScore >= 65 ? 'bg-blue-100 text-blue-800' :
-                                'bg-yellow-100 text-yellow-805'
+                                match.finalScore >= 60 ? 'bg-blue-100 text-blue-800' :
+                                match.finalScore >= 45 ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-red-100 text-red-805'
                               }`}>
-                                {match.finalScore >= 90 ? 'Exceptional' : match.finalScore >= 80 ? 'Strong' : 'Good'} ({match.finalScore}%)
+                                {match.finalScore >= 90 ? 'Exceptional' : 
+                                 match.finalScore >= 80 ? 'Strong' : 
+                                 match.finalScore >= 60 ? 'Good' : 
+                                 match.finalScore >= 45 ? 'Fair' : 
+                                 'Low Match'} ({match.finalScore}%)
                               </span>
                             </div>
                           </div>

@@ -14,6 +14,8 @@ import { authRoutes } from "./modules/auth/auth.routes";
 import { authenticate } from "./modules/auth/auth.middleware";
 import { followUpRoutes } from "./modules/followup/followup.routes.js";
 import { ProfileController } from "./modules/profile/profile.controller";
+import { upload } from "./config/multer";
+import path from "path";
 
 const app = express();
 app.use(
@@ -23,13 +25,16 @@ app.use(
   })
 );
 app.use(express.json());
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 app.use("/api/v1/auth", authRoutes); // Public route
 
 const publicProfileController = new ProfileController();
 app.get("/api/v1/public-onboarding/:token", (req, res) => publicProfileController.getClientProfileByToken(req, res));
+app.put("/api/v1/public-onboarding/:token", (req, res) => publicProfileController.clientUpdateProfile(req, res));
 app.post("/api/v1/public-onboarding/:token/approve", (req, res) => publicProfileController.clientApproveProfile(req, res));
 app.post("/api/v1/public-onboarding/:token/request-changes", (req, res) => publicProfileController.clientRequestChanges(req, res));
+app.post("/api/v1/public-onboarding/:token/upload-photo", upload.single("photo"), (req, res) => publicProfileController.clientUploadPhoto(req, res));
 
 app.use("/api/v1", authenticate); // Protect all downstream v1 API routes
 

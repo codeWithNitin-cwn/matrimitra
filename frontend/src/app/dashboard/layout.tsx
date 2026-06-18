@@ -20,15 +20,17 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   };
 
   const menuItems = [
-    { name: 'Dashboard', href: '/dashboard' },
-    { name: 'Clients', href: '/dashboard/clients' },
-    { name: 'Profiles', href: '/dashboard/profiles' },
-    { name: 'Matches', href: '/dashboard/matches' },
-    { name: 'Proposals', href: '/dashboard/proposals' },
-    { name: 'Pipeline', href: '/dashboard/pipeline' },
-    { name: 'Reports', href: '/dashboard/reports' },
-    { name: 'Settings', href: '/dashboard/settings' },
+    { name: 'Dashboard', href: '/dashboard', roles: ['OWNER', 'PROFILE_MANAGER', 'MATCHING_MANAGER', 'RELATIONSHIP_MANAGER'] },
+    { name: 'Clients', href: '/dashboard/clients', roles: ['OWNER', 'PROFILE_MANAGER'] },
+    { name: 'Profiles', href: '/dashboard/profiles', roles: ['OWNER', 'PROFILE_MANAGER', 'MATCHING_MANAGER', 'RELATIONSHIP_MANAGER'] },
+    { name: 'Matches', href: '/dashboard/matches', roles: ['OWNER', 'MATCHING_MANAGER'] },
+    { name: 'Proposals', href: '/dashboard/proposals', roles: ['OWNER', 'RELATIONSHIP_MANAGER'] },
+    { name: 'Pipeline', href: '/dashboard/pipeline', roles: ['OWNER', 'RELATIONSHIP_MANAGER'] },
+    { name: 'Reports', href: '/dashboard/reports', roles: ['OWNER'] },
+    { name: 'Settings', href: '/dashboard/settings', roles: ['OWNER'] },
   ];
+
+  const allowedMenuItems = menuItems.filter(item => item.roles.includes(user?.role || ''));
 
   const [isMounted, setIsMounted] = useState(false);
 
@@ -64,7 +66,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           <span className="text-2xl font-semibold">MM Dashboard</span>
         </div>
         <nav className="flex flex-col mt-6">
-          {menuItems.map((item) => (
+          {allowedMenuItems.map((item) => (
             <Link
               key={item.name}
               href={item.href}

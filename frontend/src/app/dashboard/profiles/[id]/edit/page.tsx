@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ProfileService } from '@/modules/profiles/profile.service';
 import api from '@/services/api';
+import { useAuthStore } from '@/modules/auth/auth.store';
 import toast from 'react-hot-toast';
 
 interface ProfileFormInputs {
@@ -121,6 +122,57 @@ export default function EditProfilePage() {
     getValues,
     formState: { errors },
   } = useForm<ProfileFormInputs>();
+
+  const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoPrimary = watch('photoPrimary');
+
+  const handlePhotoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      setSelectedPhotoFile(files[0]);
+    }
+  };
+
+  const handleUploadPhoto = async () => {
+    if (!selectedPhotoFile) {
+      toast.error("Please choose a file first.");
+      return;
+    }
+    
+    setUploadingPhoto(true);
+    const formData = new FormData();
+    formData.append('photo', selectedPhotoFile);
+    formData.append('isPrimary', 'true');
+
+    try {
+      toast.loading("Uploading photo...", { id: "photo-upload" });
+      const token = useAuthStore.getState().token;
+      const response = await fetch(`http://localhost:5000/api/v1/profiles/${id}/upload-photo`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData?.error?.message || 'Failed to upload photo');
+      }
+
+      const resData = await response.json();
+      toast.success("Photo uploaded successfully!", { id: "photo-upload" });
+      setSelectedPhotoFile(null);
+      setValue('photoPrimary', resData.data.cloudinaryUrl);
+      queryClient.invalidateQueries({ queryKey: ['profile', id] });
+    } catch (err: any) {
+      const msg = err.message || "Failed to upload photo";
+      toast.error(msg, { id: "photo-upload" });
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   useEffect(() => {
     if (profile) {
@@ -245,7 +297,7 @@ export default function EditProfilePage() {
 
       // Prepopulate photo and documents
       if (profile.photos && profile.photos.length > 0) {
-        setValue('photoPrimary', profile.photos.find((p: any) => p.isPrimary)?.cloudinaryUrl || profile.photos[0].cloudinaryUrl);
+        setValue('photoPrimary', profile.photos.find((p: any) => p.isPrimary)?.cloudinaryUrl || '');
       }
       if (profile.documents && profile.documents.length > 0) {
         setValue('documentsUploaded', profile.documents.map((d: any) => d.documentType));
@@ -820,6 +872,58 @@ export default function EditProfilePage() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* SECTION 9: Photos */}
+        <div className="pt-8 border-t border-gray-200 mt-8">
+          <h3 className="text-lg font-medium leading-6 text-gray-900 mb-2">Profile Photos</h3>
+          <p className="text-xs text-gray-500 mb-6">Manage the primary photo associated with this matrimonial profile.</p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Current Primary Photo Preview</label>
+              {photoPrimary && photoPrimary !== 'mock_photo_primary.png' ? (
+                <div className="relative w-48 h-48 rounded-md overflow-hidden bg-gray-100 border">
+                  <img
+                    src={photoPrimary.startsWith('http') ? photoPrimary : `http://localhost:5000${photoPrimary.startsWith('/') ? '' : '/'}${photoPrimary}`}
+                    alt="Current Primary"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-48 h-48 rounded-md border-2 border-dashed border-gray-300 flex flex-col items-center justify-center p-4 text-center bg-gray-50">
+                  <p className="text-xs text-gray-400">No primary photo uploaded</p>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <label className="block text-sm font-semibold text-gray-700">Replace Primary Photo</label>
+              <div className="flex flex-col gap-3">
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={handlePhotoFileChange} 
+                  className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                />
+                
+                {selectedPhotoFile && (
+                  <div className="text-xs text-gray-600 italic">
+                    Selected file: {selectedPhotoFile.name} ({(selectedPhotoFile.size / 1024 / 1024).toFixed(2)} MB)
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleUploadPhoto}
+                  disabled={uploadingPhoto || !selectedPhotoFile}
+                  className="inline-flex justify-center items-center rounded-md bg-indigo-650 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed hover:cursor-pointer w-fit"
+                >
+                  {uploadingPhoto ? 'Uploading...' : 'Upload Photo'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Actions */}

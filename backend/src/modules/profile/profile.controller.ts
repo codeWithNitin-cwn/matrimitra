@@ -479,8 +479,8 @@ export class ProfileController {
         res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid profile ID format" } });
         return;
       }
-      const { status } = req.body;
-      if (!status || !["DRAFT", "PENDING", "UNDER_REVIEW", "APPROVED", "REJECTED", "ARCHIVED", "AGENCY_COMPLETED", "ONBOARDING_SENT", "CLIENT_APPROVED", "AGENCY_APPROVED", "ACTIVE"].includes(status)) {
+      const { status, reason } = req.body;
+      if (!status || !["DRAFT", "PENDING", "UNDER_REVIEW", "APPROVED", "REJECTED", "ARCHIVED", "AGENCY_COMPLETED", "ONBOARDING_SENT", "CLIENT_APPROVED", "AGENCY_APPROVED", "ACTIVE", "CORRECTION_REQUESTED", "CLIENT_UPDATED"].includes(status)) {
         res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid status value" } });
         return;
       }
@@ -492,7 +492,7 @@ export class ProfileController {
         return;
       }
 
-      const profile = await this.profileService.updateStatus(profileId, agencyId, userId, status);
+      const profile = await this.profileService.updateStatus(profileId, agencyId, userId, status, reason);
       res.status(200).json({ success: true, data: profile });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to update profile status";
@@ -542,6 +542,17 @@ export class ProfileController {
     }
   }
 
+  async clientUpdateProfile(req: Request, res: Response): Promise<void> {
+    try {
+      const token = req.params.token as string;
+      const profile = await this.profileService.clientUpdateProfile(token, req.body);
+      res.status(200).json({ success: true, data: profile });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to update profile";
+      res.status(400).json({ success: false, error: { code: "BUSINESS_RULE_ERROR", message } });
+    }
+  }
+
   async clientRequestChanges(req: Request, res: Response): Promise<void> {
     try {
       const token = req.params.token as string;
@@ -550,6 +561,45 @@ export class ProfileController {
       res.status(200).json({ success: true, data: profile });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to submit change request";
+      res.status(400).json({ success: false, error: { code: "BUSINESS_RULE_ERROR", message } });
+    }
+  }
+
+  async uploadPhoto(req: Request, res: Response): Promise<void> {
+    try {
+      const { profileId } = req.params;
+      if (typeof profileId !== "string") {
+        res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid profile ID format" } });
+        return;
+      }
+      if (!req.file) {
+        res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "No file uploaded" } });
+        return;
+      }
+      const isPrimary = req.body.isPrimary === "true" || req.body.isPrimary === true;
+      const photo = await this.profileService.uploadPhoto(profileId, req.file, isPrimary);
+      res.status(201).json({ success: true, data: photo });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to upload photo";
+      res.status(400).json({ success: false, error: { code: "BUSINESS_RULE_ERROR", message } });
+    }
+  }
+
+  async clientUploadPhoto(req: Request, res: Response): Promise<void> {
+    try {
+      const { token } = req.params;
+      if (typeof token !== "string") {
+        res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid token format" } });
+        return;
+      }
+      if (!req.file) {
+        res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "No file uploaded" } });
+        return;
+      }
+      const photo = await this.profileService.clientUploadPhoto(token, req.file);
+      res.status(201).json({ success: true, data: photo });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to upload photo";
       res.status(400).json({ success: false, error: { code: "BUSINESS_RULE_ERROR", message } });
     }
   }

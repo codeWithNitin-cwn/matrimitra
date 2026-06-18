@@ -296,7 +296,7 @@ export class ProfileService {
     return this.repository.findProfileAnswers(profileId);
   }
 
-  async updateStatus(profileId: string, queryingAgencyId: string, queryingUserId: string, status: any) {
+  async updateStatus(profileId: string, queryingAgencyId: string, queryingUserId: string, status: any, reason?: string) {
     const profile = await this.repository.findProfileById(profileId);
     if (!profile) {
       throw new Error("Profile not found");
@@ -307,14 +307,15 @@ export class ProfileService {
 
     let result;
     if (status === "ACTIVE") {
-      const isClientApproved = profile.clientApproved;
-      const newStatus = isClientApproved ? "ACTIVE" : "UNDER_REVIEW";
+      const isClientApproved = profile.clientApproved || profile.status === "CLIENT_UPDATED";
+      const newStatus = isClientApproved ? "ACTIVE" : "PENDING";
 
       result = await prisma.agencyProfile.update({
         where: { id: profileId },
         data: {
           agencyApproved: true,
           agencyApprovedAt: new Date(),
+          clientApproved: isClientApproved,
           status: newStatus
         }
       });
@@ -323,11 +324,14 @@ export class ProfileService {
         throw new Error("Cannot activate profile. Client must approve first");
       }
     } else {
-      // If setting to another status (like DRAFT or UNDER_REVIEW), also update flags if needed
+      // If setting to another status (like DRAFT, CORRECTION_REQUESTED, etc.)
       const dataUpdate: any = { status };
-      if (status === "DRAFT") {
+      if (status === "DRAFT" || status === "CORRECTION_REQUESTED") {
         dataUpdate.agencyApproved = false;
         dataUpdate.clientApproved = false;
+      }
+      if (status === "CORRECTION_REQUESTED") {
+        dataUpdate.clientRejectedReason = reason || null;
       }
       result = await prisma.agencyProfile.update({
         where: { id: profileId },
@@ -365,6 +369,9 @@ export class ProfileService {
     }
     if (profile.agencyId !== queryingAgencyId) {
       throw new Error("Unauthorized: Profile belongs to another agency");
+    }
+    if (profile.status === "ACTIVE") {
+      throw new Error("Cannot generate onboarding link for an active profile");
     }
 
     const token = crypto.randomUUID();
@@ -415,7 +422,7 @@ export class ProfileService {
     }
 
     const isAgencyApproved = profile.agencyApproved;
-    const newStatus = isAgencyApproved ? "ACTIVE" : "UNDER_REVIEW";
+    const newStatus = isAgencyApproved ? "ACTIVE" : "PENDING";
 
     return prisma.agencyProfile.update({
       where: { id: profile.id },
@@ -423,6 +430,32 @@ export class ProfileService {
         clientApproved: true,
         clientApprovedAt: new Date(),
         status: newStatus,
+        clientRejectedReason: null
+      }
+    });
+  }
+
+  async clientUpdateProfile(token: string, data: any) {
+    const profile = await prisma.agencyProfile.findFirst({
+      where: {
+        onboardingToken: token,
+        onboardingExpiry: { gte: new Date() }
+      }
+    });
+
+    if (!profile) {
+      throw new Error("Invalid or expired onboarding token");
+    }
+
+    // Call existing repository transaction to update fields
+    await this.repository.updateDraftTransaction(profile.id, data);
+
+    // After updating, set clientApproved: true and status: CLIENT_UPDATED
+    return prisma.agencyProfile.update({
+      where: { id: profile.id },
+      data: {
+        clientApproved: true,
+        status: "CLIENT_UPDATED",
         clientRejectedReason: null
       }
     });
@@ -443,7 +476,7 @@ export class ProfileService {
     return prisma.agencyProfile.update({
       where: { id: profile.id },
       data: {
-        status: "UNDER_REVIEW",
+        status: "CORRECTION_REQUESTED",
         clientApproved: false,
         clientRejectedReason: reason || null
       }
@@ -476,5 +509,47 @@ export class ProfileService {
         action
       }
     });
+  }
+
+  async uploadPhoto(profileId: string, file: any, isPrimary: boolean = true) {
+    const profile = await prisma.agencyProfile.findUnique({
+      where: { id: profileId }
+    });
+    if (!profile) {
+      throw new Error("Profile not found");
+    }
+
+    const fileUrl = `http://localhost:5000/uploads/${file.filename}`;
+
+    if (isPrimary) {
+      await prisma.profilePhoto.updateMany({
+        where: { profileId, isPrimary: true },
+        data: { isPrimary: false }
+      });
+    }
+
+    const photo = await prisma.profilePhoto.create({
+      data: {
+        profileId,
+        cloudinaryUrl: fileUrl,
+        isPrimary,
+        approvalStatus: "APPROVED"
+      }
+    });
+
+    return photo;
+  }
+
+  async clientUploadPhoto(token: string, file: any) {
+    const profile = await prisma.agencyProfile.findFirst({
+      where: {
+        onboardingToken: token,
+        onboardingExpiry: { gte: new Date() }
+      }
+    });
+    if (!profile) {
+      throw new Error("Invalid or expired onboarding token");
+    }
+    return this.uploadPhoto(profile.id, file, true);
   }
 }

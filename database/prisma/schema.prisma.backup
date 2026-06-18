@@ -428,8 +428,6 @@ enum ProfileStatus {
   CLIENT_APPROVED
   AGENCY_APPROVED
   ACTIVE
-  CORRECTION_REQUESTED
-  CLIENT_UPDATED
 }
 
 enum DocumentType {

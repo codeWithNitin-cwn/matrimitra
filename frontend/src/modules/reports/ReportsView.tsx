@@ -11,13 +11,18 @@ import {
   ArrowDownTrayIcon 
 } from '@heroicons/react/24/outline';
 
+import { useAuthStore } from '../auth/auth.store';
+
 export default function ReportsView() {
+  const { user } = useAuthStore();
+  const isOwner = user?.role === 'OWNER';
   const [exportingType, setExportingType] = useState<string | null>(null);
 
   // 1. Fetch dashboard summaries
   const { data: stats, isLoading: isLoadingStats, isError: isErrorStats, refetch: refetchStats } = useQuery({
     queryKey: ['dashboardStats'],
     queryFn: () => dashboardService.getStats(),
+    enabled: isOwner,
   });
 
   // 2. Fetch proposal status report details
@@ -26,7 +31,8 @@ export default function ReportsView() {
     queryFn: async () => {
       const response = await api.get('/reports/proposals');
       return response.data?.data || [];
-    }
+    },
+    enabled: isOwner,
   });
 
   // 3. Fetch pipeline stage funnel counts
@@ -35,8 +41,18 @@ export default function ReportsView() {
     queryFn: async () => {
       const response = await api.get('/reports/pipeline');
       return response.data?.data || [];
-    }
+    },
+    enabled: isOwner,
   });
+
+  if (!isOwner) {
+    return (
+      <div className="p-8 bg-red-50 border border-red-200 rounded-xl text-red-700">
+        <h2 className="text-lg font-bold mb-2">Access Denied</h2>
+        <p className="text-sm">You do not have permission to view analytical reports.</p>
+      </div>
+    );
+  }
 
   const handleRefreshAll = () => {
     refetchStats();

@@ -8,6 +8,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { ProfileService } from '@/modules/profiles/profile.service';
 import { ClientService } from '@/modules/clients/client.service';
 import api from '@/services/api';
+import { useAuthStore } from '@/modules/auth/auth.store';
 import toast from 'react-hot-toast';
 import { CheckCircleIcon, PlayIcon, ShieldCheckIcon } from '@heroicons/react/24/solid';
 
@@ -266,6 +267,45 @@ function CreateProfileWizard() {
   const handleSaveDraftOnly = () => {
     const currentData = getValues();
     saveDraftMutation.mutate(currentData);
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    if (!profileId) {
+      toast.error("Please save the profile draft first before uploading photos.");
+      return;
+    }
+
+    const file = files[0];
+    const formData = new FormData();
+    formData.append('photo', file);
+    formData.append('isPrimary', 'true');
+
+    try {
+      toast.loading("Uploading photo...", { id: "photo-upload" });
+      const token = useAuthStore.getState().token;
+      const response = await fetch(`http://localhost:5000/api/v1/profiles/${profileId}/upload-photo`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData?.error?.message || 'Failed to upload photo');
+      }
+
+      const resData = await response.json();
+      toast.success("Photo uploaded successfully!", { id: "photo-upload" });
+      setValue('photoPrimary', resData.data.cloudinaryUrl);
+    } catch (err: any) {
+      const msg = err.message || "Failed to upload photo";
+      toast.error(msg, { id: "photo-upload" });
+    }
   };
 
   const handleNextStep = () => {
@@ -893,21 +933,42 @@ function CreateProfileWizard() {
               
               <div>
                 <h3 className="text-sm font-semibold text-gray-800 mb-3">Profile Photos</h3>
-                <div className="border border-dashed border-gray-300 rounded p-6 text-center bg-gray-50">
-                  <svg className="mx-auto h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 48 48">
-                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <label className="block text-xs font-semibold text-indigo-600 mt-2 hover:underline cursor-pointer">
-                    Click to add files
-                    <input 
-                      type="file" 
-                      multiple 
-                      className="sr-only" 
-                      onChange={() => setValue('photoPrimary', 'mock_photo_primary.png')}
-                    />
-                  </label>
-                  <p className="text-[10px] text-gray-400 mt-1">Accepts PNG, JPG up to 10MB</p>
-                </div>
+                {watchedFields.photoPrimary && watchedFields.photoPrimary !== 'mock_photo_primary.png' ? (
+                  <div className="flex items-center gap-4 p-4 border rounded bg-gray-50">
+                    <div className="relative w-24 h-24 rounded overflow-hidden border bg-white">
+                      <img 
+                        src={watchedFields.photoPrimary.startsWith('http') ? watchedFields.photoPrimary : `http://localhost:5000${watchedFields.photoPrimary.startsWith('/') ? '' : '/'}${watchedFields.photoPrimary}`} 
+                        alt="Primary Preview" 
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-700">Primary Photo Uploaded</p>
+                      <button 
+                        type="button" 
+                        onClick={() => setValue('photoPrimary', '')} 
+                        className="text-xs text-red-650 hover:underline mt-1 block"
+                      >
+                        Remove Photo
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border border-dashed border-gray-300 rounded p-6 text-center bg-gray-50">
+                    <svg className="mx-auto h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 48 48">
+                      <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <label className="block text-xs font-semibold text-indigo-600 mt-2 hover:underline cursor-pointer">
+                      Click to add file
+                      <input 
+                        type="file" 
+                        className="sr-only" 
+                        onChange={handlePhotoUpload}
+                      />
+                    </label>
+                    <p className="text-[10px] text-gray-400 mt-1">Accepts PNG, JPG up to 10MB</p>
+                  </div>
+                )}
               </div>
 
               <div className="pt-4 border-t">

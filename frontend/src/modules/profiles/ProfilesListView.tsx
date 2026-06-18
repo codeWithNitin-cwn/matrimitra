@@ -23,10 +23,10 @@ function calculateCompletion(profile: any) {
 }
 
 function getStatusBadge(status: string, completion: number) {
-  if (status === 'APPROVED') {
+  if (status === 'ACTIVE' || status === 'APPROVED') {
     return (
       <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-        Approved
+        Active
       </span>
     );
   }
@@ -34,6 +34,20 @@ function getStatusBadge(status: string, completion: number) {
     return (
       <span className="inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20">
         Rejected
+      </span>
+    );
+  }
+  if (status === 'CORRECTION_REQUESTED') {
+    return (
+      <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20">
+        Revision Requested
+      </span>
+    );
+  }
+  if (status === 'CLIENT_UPDATED') {
+    return (
+      <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10">
+        Client Updated
       </span>
     );
   }
@@ -74,17 +88,17 @@ export default function ProfilesListView() {
         
         let matchesStatus = true;
         if (statusFilter === "APPROVED") {
-          matchesStatus = profile.status === "APPROVED";
+          matchesStatus = profile.status === "APPROVED" || profile.status === "ACTIVE";
         } else if (statusFilter === "DRAFT") {
-          matchesStatus = profile.status !== "APPROVED";
+          matchesStatus = profile.status !== "APPROVED" && profile.status !== "ACTIVE";
         }
         
         return matchesSearch && matchesGender && matchesStatus;
       })
       .sort((a: any, b: any) => {
-        const aApproved = a.status === "APPROVED" ? 1 : 0;
-        const bApproved = b.status === "APPROVED" ? 1 : 0;
-        return bApproved - aApproved;
+        const aActive = (a.status === "APPROVED" || a.status === "ACTIVE") ? 1 : 0;
+        const bActive = (b.status === "APPROVED" || b.status === "ACTIVE") ? 1 : 0;
+        return bActive - aActive;
       });
   }, [profiles, searchTerm, genderFilter, statusFilter]);
 
@@ -127,7 +141,7 @@ export default function ProfilesListView() {
           className="border border-gray-300 rounded-md px-4 py-2 text-sm w-full sm:w-48 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
         >
           <option value="ALL">All Statuses</option>
-          <option value="APPROVED">Approved Only</option>
+          <option value="APPROVED">Active Only</option>
           <option value="DRAFT">Drafts Only</option>
         </select>
       </div>

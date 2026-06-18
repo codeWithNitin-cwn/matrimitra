@@ -11,6 +11,16 @@ function getCleanQuestionText(rawText: string): string {
   }
 }
 
+function isEssayQuestion(question: any, optionText: string): boolean {
+  if (optionText === "TEXT_ANSWER") return true;
+  if (!question?.questionText) return false;
+  try {
+    const parsed = JSON.parse(question.questionText);
+    if (parsed.type === "LONG_TEXT") return true;
+  } catch {}
+  return false;
+}
+
 function getMatchedAnswerSentence(question: string, answer: string): string | null {
   const q = question.toLowerCase();
   const a = answer.toLowerCase().trim();
@@ -514,6 +524,9 @@ export async function generateAIExplanation(
     if (cAns) {
       const tOpt = tAns.selectedOption?.optionText || "";
       const cOpt = cAns.selectedOption?.optionText || "";
+      if (isEssayQuestion(tAns.question, tOpt) || isEssayQuestion(cAns.question, cOpt)) {
+        continue;
+      }
       if (tOpt.toLowerCase().trim() === cOpt.toLowerCase().trim()) {
         matchedQA.push({ question: cleanQText, answer: tOpt });
       } else {
@@ -890,6 +903,9 @@ export async function generateConversationStarters(
     if (cAns) {
       const tOpt = tAns.selectedOption?.optionText || "";
       const cOpt = cAns.selectedOption?.optionText || "";
+      if (isEssayQuestion(tAns.question, tOpt) || isEssayQuestion(cAns.question, cOpt)) {
+        continue;
+      }
       if (tOpt.toLowerCase().trim() === cOpt.toLowerCase().trim()) {
         matchedQA.push({ question: cleanQText, answer: tOpt });
       }
@@ -955,7 +971,7 @@ export async function generateProposalRecommendation(
   }
 
   // Calculate successProbability: starts at finalScore, penalize slightly if confidence is low
-  let successProbability = score;
+  let successProbability = Math.max(0, Math.min(100, score));
   if (confidenceScore < 50) {
     successProbability = Math.max(0, successProbability - 10);
   }

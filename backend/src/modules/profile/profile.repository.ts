@@ -586,6 +586,11 @@ export class ProfileRepository {
       include: {
         person: true,
         personal: true,
+        _count: {
+          select: {
+            compatibilitiesSent: true
+          }
+        }
       },
     });
   }

@@ -48,9 +48,10 @@ export default function ViewProfilePage() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: (newStatus: string) => ProfileService.updateStatus(id, newStatus),
+    mutationFn: ({ status, reason }: { status: string; reason?: string }) => 
+      ProfileService.updateStatus(id, status, reason),
     onSuccess: (res, variables) => {
-      toast.success(`Profile status updated to ${variables}!`);
+      toast.success(`Profile status updated to ${variables.status}!`);
       queryClient.invalidateQueries({ queryKey: ['profile', id] });
       queryClient.invalidateQueries({ queryKey: ['profiles'] });
     },
@@ -73,11 +74,17 @@ export default function ViewProfilePage() {
   });
 
   const handleApprove = () => {
-    updateStatusMutation.mutate('ACTIVE');
+    updateStatusMutation.mutate({ status: 'ACTIVE' });
   };
 
   const handleReject = () => {
-    updateStatusMutation.mutate('DRAFT');
+    updateStatusMutation.mutate({ status: 'DRAFT' });
+  };
+
+  const handleRequestCorrections = () => {
+    const reason = prompt("Please enter the reason for requesting corrections:");
+    if (reason === null) return;
+    updateStatusMutation.mutate({ status: 'CORRECTION_REQUESTED', reason });
   };
 
   if (isPending) {
@@ -91,6 +98,27 @@ export default function ViewProfilePage() {
       </div>
     );
   }
+
+  // Resolve primary photo and log it
+  const primaryPhoto = profile?.photos?.find((p: any) => p.isPrimary);
+  const rawUrl = primaryPhoto?.cloudinaryUrl;
+  let photoUrl = '';
+  if (rawUrl) {
+    if (rawUrl === 'mock_photo_primary.png') {
+      photoUrl = profile?.person?.gender?.toUpperCase() === 'FEMALE'
+        ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+        : 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80';
+    } else if (rawUrl.startsWith('http')) {
+      photoUrl = rawUrl;
+    } else {
+      photoUrl = `http://localhost:5000${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
+    }
+  } else {
+    photoUrl = profile?.person?.gender?.toUpperCase() === 'FEMALE'
+      ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
+      : 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80';
+  }
+
 
   // Format height from Cm back to Ft/In if possible
   const formatHeight = (heightCm: number | undefined | null) => {
@@ -144,10 +172,19 @@ export default function ViewProfilePage() {
           {profile.status !== 'ACTIVE' && (
             <button
               onClick={handleApprove}
-              disabled={updateStatusMutation.isPending || profile.agencyApproved}
-              className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-505 disabled:opacity-50 disabled:cursor-not-allowed hover:cursor-pointer"
+              disabled={updateStatusMutation.isPending}
+              className="inline-flex items-center justify-center rounded-md bg-indigo-650 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-600 disabled:opacity-50 hover:cursor-pointer"
             >
-              {profile.agencyApproved ? 'Agency Approved' : (profile.clientApproved ? 'Approve & Activate' : 'Agency Approve')}
+              {profile.status === 'CLIENT_UPDATED' ? 'Approve Changes & Activate' : 'Approve & Activate'}
+            </button>
+          )}
+          {profile.status !== 'CORRECTION_REQUESTED' && profile.status !== 'DRAFT' && profile.status !== 'ACTIVE' && (
+            <button
+              onClick={handleRequestCorrections}
+              disabled={updateStatusMutation.isPending}
+              className="inline-flex items-center justify-center rounded-md bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-500 disabled:opacity-50 hover:cursor-pointer"
+            >
+              Request Corrections
             </button>
           )}
           {profile.status !== 'DRAFT' && (
@@ -412,70 +449,72 @@ export default function ViewProfilePage() {
               </div>
             )}
 
-            {/* Link details */}
-            {profile.onboardingLink ? (
-              <div className="space-y-2">
-                <div className="text-xs bg-slate-50 border border-gray-200 p-2.5 rounded break-all text-gray-600 font-mono">
-                  {profile.onboardingLink}
-                </div>
-                <div className="flex justify-between items-center gap-2">
-                  <span className="text-[10px] text-gray-400">
-                    Expires: {new Date(profile.onboardingExpiry).toLocaleDateString()}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(profile.onboardingLink);
-                      toast.success("Onboarding link copied!");
-                    }}
-                    className="text-xs font-semibold text-indigo-650 hover:text-indigo-850"
-                  >
-                    Copy Link
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-gray-400 italic">No active review link generated.</p>
-            )}
+             {/* Link details / Generation */}
+             {profile.status === 'ACTIVE' ? (
+               <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs p-3 rounded-md flex items-center justify-center gap-1.5 font-bold">
+                 Onboarding Completed ✓
+               </div>
+             ) : (
+               <>
+                 {profile.onboardingLink ? (
+                   <div className="space-y-2">
+                     <div className="text-xs bg-slate-50 border border-gray-200 p-2.5 rounded break-all text-gray-600 font-mono">
+                       {profile.onboardingLink}
+                     </div>
+                     <div className="flex justify-between items-center gap-2">
+                       <span className="text-[10px] text-gray-400">
+                         Expires: {new Date(profile.onboardingExpiry).toLocaleDateString()}
+                       </span>
+                       <button
+                         type="button"
+                         onClick={() => {
+                           navigator.clipboard.writeText(profile.onboardingLink);
+                           toast.success("Onboarding link copied!");
+                         }}
+                         className="text-xs font-semibold text-indigo-650 hover:text-indigo-850"
+                       >
+                         Copy Link
+                       </button>
+                     </div>
+                   </div>
+                 ) : (
+                   <p className="text-xs text-gray-400 italic">No active review link generated.</p>
+                 )}
 
-            {/* Generate link button */}
-            <button
-              type="button"
-              disabled={generateOnboardingMutation.isPending}
-              onClick={() => generateOnboardingMutation.mutate()}
-              className="w-full inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-505 disabled:opacity-50"
-            >
-              {generateOnboardingMutation.isPending ? 'Generating...' : (profile.onboardingLink ? 'Regenerate Link' : 'Generate Onboarding Link')}
-            </button>
+                 {/* Generate link button */}
+                 <button
+                   type="button"
+                   disabled={generateOnboardingMutation.isPending}
+                   onClick={() => generateOnboardingMutation.mutate()}
+                   className="w-full inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-505 disabled:opacity-50"
+                 >
+                   {generateOnboardingMutation.isPending ? 'Generating...' : (profile.onboardingLink ? 'Regenerate Link' : 'Generate Onboarding Link')}
+                 </button>
+               </>
+             )}
           </div>
 
           {/* Card: Primary Photo */}
           <div className="bg-white shadow rounded-lg overflow-hidden border border-gray-200 p-4">
             <h3 className="text-sm font-bold text-gray-500 mb-3 uppercase tracking-wider">Primary Photo</h3>
-            {profile.photos && profile.photos.length > 0 ? (
-              <div 
-                className="relative aspect-square rounded-md overflow-hidden bg-gray-100 border cursor-pointer"
-                onClick={async () => {
-                  toast.success("Viewing photos...");
-                  try {
-                    await ProfileService.logAccess(id, 'VIEW_PHOTOS');
-                    queryClient.invalidateQueries({ queryKey: ['profile', id] });
-                  } catch (err) {
-                    console.error(err);
-                  }
-                }}
-              >
-                <img
-                  src={profile.photos.find((p: any) => p.isPrimary)?.cloudinaryUrl || profile.photos[0].cloudinaryUrl}
-                  alt="Profile"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            ) : (
-              <div className="aspect-square rounded-md border-2 border-dashed border-gray-300 flex flex-col items-center justify-center p-4 text-center">
-                <p className="text-xs text-gray-400">No primary photo uploaded</p>
-              </div>
-            )}
+            <div 
+              className="relative aspect-square rounded-md overflow-hidden bg-gray-100 border cursor-pointer"
+              onClick={async () => {
+                toast.success("Viewing photos...");
+                try {
+                  await ProfileService.logAccess(id, 'VIEW_PHOTOS');
+                  queryClient.invalidateQueries({ queryKey: ['profile', id] });
+                } catch (err) {
+                  console.error(err);
+                }
+              }}
+            >
+              <img
+                src={photoUrl}
+                alt="Profile"
+                className="w-full h-full object-cover"
+              />
+            </div>
           </div>
           
           {/* Card: Contact Information */}

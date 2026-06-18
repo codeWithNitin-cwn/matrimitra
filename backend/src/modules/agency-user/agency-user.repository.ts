@@ -13,4 +13,24 @@ export class AgencyUserRepository {
   async create(data: Prisma.AgencyUserUncheckedCreateInput) {
     return prisma.agencyUser.create({ data });
   }
+
+  async findAll(agencyId: string) {
+    return prisma.agencyUser.findMany({
+      where: { agencyId },
+      orderBy: { createdAt: "desc" }
+    });
+  }
+
+  async findById(id: string, agencyId: string) {
+    return prisma.agencyUser.findFirst({
+      where: { id, agencyId }
+    });
+  }
+
+  async update(id: string, agencyId: string, data: Prisma.AgencyUserUncheckedUpdateInput) {
+    return prisma.agencyUser.update({
+      where: { id, agencyId },
+      data
+    });
+  }
 }
