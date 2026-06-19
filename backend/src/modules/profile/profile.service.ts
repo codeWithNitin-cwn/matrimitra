@@ -32,13 +32,19 @@ export class ProfileService {
     );
   }
 
-  async getProfileById(id: string, queryingAgencyId: string, queryingUserId: string) {
+  async getProfileById(id: string, queryingAgencyId: string, queryingUserId: string, viewerProfileId?: string) {
     const profile = await this.repository.findFullProfileById(id);
     if (!profile) {
       throw new Error("Profile not found");
     }
     if (profile.agencyId !== queryingAgencyId) {
-      const isAccepted = await this.repository.hasAcceptedProposal(id, queryingAgencyId);
+      let isAccepted = false;
+      if (viewerProfileId) {
+        const viewerProfile = await this.repository.findProfileById(viewerProfileId);
+        if (viewerProfile && viewerProfile.agencyId === queryingAgencyId) {
+          isAccepted = await this.repository.hasAcceptedProposal(id, viewerProfileId);
+        }
+      }
       if (!isAccepted) {
         if (profile.person) {
           profile.person.firstName = "Partner";
@@ -620,5 +626,26 @@ export class ProfileService {
       throw new Error("Invalid or expired onboarding token");
     }
     return this.uploadPhoto(profile.id, file, true);
+  }
+
+  async deleteProfile(profileId: string, agencyId: string, userRole: string) {
+    if (userRole !== "OWNER") {
+      throw new Error("Unauthorized: Only OWNER can delete profiles");
+    }
+
+    const profile = await this.repository.findProfileById(profileId);
+    if (!profile) {
+      throw new Error("Profile not found");
+    }
+
+    if (profile.agencyId !== agencyId) {
+      throw new Error("Unauthorized: Profile belongs to another agency");
+    }
+
+    if (profile.status !== "DRAFT") {
+      throw new Error("Invalid profile status: Only DRAFT profiles can be deleted");
+    }
+
+    await this.repository.deleteProfileTransaction(profileId, profile.personId);
   }
 }

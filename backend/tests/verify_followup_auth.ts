@@ -111,6 +111,8 @@ async function run() {
         brideProfileId: profileA.id, // linked to bride (owned by A) for simplicity of test, but proposal is owned by B
         groomProfileId: profileB.id,
         proposalStatus: "ACCEPTED",
+        brideAccepted: true,
+        groomAccepted: true,
         createdBy: "SYSTEM"
       }
     });

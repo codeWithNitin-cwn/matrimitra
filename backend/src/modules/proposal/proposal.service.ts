@@ -38,19 +38,27 @@ export class ProposalService {
       throw new Error("Invalid proposal: Groom profile must belong to a person of MALE gender");
     }
 
-    // Enforce agency ownership validation
-    const isBrideOwnerSender = brideProfile.agencyId === agencyId;
-    const isBrideOwnerReceiver = brideProfile.agencyId === data.receiverAgencyId;
-    const isGroomOwnerSender = groomProfile.agencyId === agencyId;
-    const isGroomOwnerReceiver = groomProfile.agencyId === data.receiverAgencyId;
-
-    if (brideProfile.agencyId === groomProfile.agencyId) {
-      throw new Error("Invalid proposal: Bride and Groom profiles cannot belong to the same agency");
+    if (data.brideProfileId === data.groomProfileId) {
+      throw new Error("Invalid proposal: Bride and Groom profiles cannot be the same");
     }
 
-    const validPairing = (isBrideOwnerSender && isGroomOwnerReceiver) || (isGroomOwnerSender && isBrideOwnerReceiver);
-    if (!validPairing) {
-      throw new Error("Invalid proposal: One profile must belong to the sender agency and the other to the receiver agency. Third-party profiles are not allowed.");
+    const isInternal = brideProfile.agencyId === groomProfile.agencyId;
+    const matchType = isInternal ? "INTERNAL" : "CROSS_AGENCY";
+
+    if (!isInternal) {
+      const isBrideOwnerSender = brideProfile.agencyId === agencyId;
+      const isBrideOwnerReceiver = brideProfile.agencyId === data.receiverAgencyId;
+      const isGroomOwnerSender = groomProfile.agencyId === agencyId;
+      const isGroomOwnerReceiver = groomProfile.agencyId === data.receiverAgencyId;
+
+      const validPairing = (isBrideOwnerSender && isGroomOwnerReceiver) || (isGroomOwnerSender && isBrideOwnerReceiver);
+      if (!validPairing) {
+        throw new Error("Invalid proposal: One profile must belong to the sender agency and the other to the receiver agency. Third-party profiles are not allowed.");
+      }
+    } else {
+      if (brideProfile.agencyId !== agencyId || groomProfile.agencyId !== agencyId || data.receiverAgencyId !== agencyId) {
+        throw new Error("Invalid proposal: For internal proposals, both profiles must belong to your agency and receiver agency must match sender agency.");
+      }
     }
 
     const activeProposal = await prisma.proposal.findFirst({
@@ -68,11 +76,25 @@ export class ProposalService {
     const proposalStatus = "SENT"; // Initial status
 
     // senderAgencyId and createdBy are pinned to the JWT-authenticated user — never from client body
-    return this.repository.create({ ...data, senderAgencyId: agencyId, createdBy: userId, proposalNumber, proposalStatus });
+    return this.repository.create({ ...data, senderAgencyId: agencyId, createdBy: userId, proposalNumber, proposalStatus, matchType });
   }
 
   async getProposals(agencyId: string) {
-    return this.repository.findAll(agencyId);
+    const proposals = await this.repository.findAll(agencyId);
+    for (const proposal of proposals) {
+      const isUnlocked = proposal.proposalStatus === "ACCEPTED" && proposal.brideAccepted === true && proposal.groomAccepted === true;
+      if (!isUnlocked) {
+        if (proposal.brideProfile && proposal.brideProfile.agencyId !== agencyId && proposal.brideProfile.person) {
+          proposal.brideProfile.person.email = "Hidden until proposal acceptance";
+          proposal.brideProfile.person.mobile = "Hidden until proposal acceptance";
+        }
+        if (proposal.groomProfile && proposal.groomProfile.agencyId !== agencyId && proposal.groomProfile.person) {
+          proposal.groomProfile.person.email = "Hidden until proposal acceptance";
+          proposal.groomProfile.person.mobile = "Hidden until proposal acceptance";
+        }
+      }
+    }
+    return proposals;
   }
 
   async getProposalById(id: string, queryingAgencyId: string) {
@@ -81,7 +103,8 @@ export class ProposalService {
       throw new Error("Proposal not found");
     }
     // Privacy lock: mask email/mobile of cross-agency client profiles if proposal is not accepted
-    if (proposal.proposalStatus !== "ACCEPTED") {
+    const isUnlocked = proposal.proposalStatus === "ACCEPTED" && proposal.brideAccepted === true && proposal.groomAccepted === true;
+    if (!isUnlocked) {
       if (proposal.brideProfile && proposal.brideProfile.agencyId !== queryingAgencyId && proposal.brideProfile.person) {
         proposal.brideProfile.person.email = "Hidden until proposal acceptance";
         proposal.brideProfile.person.mobile = "Hidden until proposal acceptance";
@@ -109,7 +132,11 @@ export class ProposalService {
       // 1. Update proposal status
       await tx.proposal.update({
         where: { id },
-        data: { proposalStatus: "ACCEPTED" }
+        data: {
+          proposalStatus: "ACCEPTED",
+          brideAccepted: true,
+          groomAccepted: true
+        }
       });
 
       // 2. Create proposal activity record

@@ -60,4 +60,8 @@ export const ProfileService = {
     const response = await api.post(`/profiles/${id}/onboarding-link`);
     return response.data?.data;
   },
+  async deleteProfile(id: string) {
+    const response = await api.delete(`/profiles/${id}`);
+    return response.data;
+  },
 };

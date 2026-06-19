@@ -652,20 +652,16 @@ export class ProfileRepository {
     });
   }
 
-  async hasAcceptedProposal(profileId: string, agencyId: string): Promise<boolean> {
+  async hasAcceptedProposal(profileId: string, viewerProfileId: string): Promise<boolean> {
     const proposal = await prisma.proposal.findFirst({
       where: {
         proposalStatus: "ACCEPTED",
+        brideAccepted: true,
+        groomAccepted: true,
         OR: [
-          { brideProfileId: profileId },
-          { groomProfileId: profileId }
-        ],
-        AND: {
-          OR: [
-            { senderAgencyId: agencyId },
-            { receiverAgencyId: agencyId }
-          ]
-        }
+          { brideProfileId: profileId, groomProfileId: viewerProfileId },
+          { brideProfileId: viewerProfileId, groomProfileId: profileId }
+        ]
       }
     });
     return !!proposal;
@@ -678,6 +674,45 @@ export class ProfileRepository {
       include: {
         person: true,
         personal: true,
+      }
+    });
+  }
+
+  async deleteProfileTransaction(profileId: string, personId: string) {
+    return prisma.$transaction(async (tx) => {
+      // 1. Delete all related profile records
+      await tx.profilePersonal.deleteMany({ where: { profileId } });
+      await tx.profileEducation.deleteMany({ where: { profileId } });
+      await tx.profileCareer.deleteMany({ where: { profileId } });
+      await tx.profileFamily.deleteMany({ where: { profileId } });
+      await tx.profileLifestyle.deleteMany({ where: { profileId } });
+      await tx.profilePreference.deleteMany({ where: { profileId } });
+      await tx.profilePhoto.deleteMany({ where: { profileId } });
+      await tx.profileDocument.deleteMany({ where: { profileId } });
+      await tx.profileAnswer.deleteMany({ where: { profileId } });
+      await tx.userTrait.deleteMany({ where: { profileId } });
+      await tx.followUp.deleteMany({ where: { profileId } });
+      await tx.profileAccessLog.deleteMany({ where: { profileId } });
+      
+      // Delete any proposals referencing this profile
+      await tx.proposal.deleteMany({
+        where: {
+          OR: [
+            { brideProfileId: profileId },
+            { groomProfileId: profileId }
+          ]
+        }
+      });
+
+      // 2. Delete the AgencyProfile itself
+      await tx.agencyProfile.delete({ where: { id: profileId } });
+
+      // 3. Delete the Person record if it is no longer referenced by any other profiles
+      const otherProfilesCount = await tx.agencyProfile.count({
+        where: { personId }
+      });
+      if (otherProfilesCount === 0) {
+        await tx.person.delete({ where: { id: personId } });
       }
     });
   }

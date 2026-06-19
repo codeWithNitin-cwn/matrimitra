@@ -8,7 +8,7 @@ async function main() {
 
   // 1. Fetch a profile that has matches or just any approved profile
   const profile = await prisma.agencyProfile.findFirst({
-    where: { status: "APPROVED" }
+    where: { status: "ACTIVE" }
   });
 
   if (!profile) {

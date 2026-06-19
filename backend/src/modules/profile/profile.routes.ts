@@ -31,4 +31,7 @@ router.post("/:profileId/onboarding-link", requireRole(["OWNER", "PROFILE_MANAGE
 // Profile access logs — OWNER, PROFILE_MANAGER, MATCHING_MANAGER, RELATIONSHIP_MANAGER
 router.post("/:profileId/access-log", requireRole(["OWNER", "PROFILE_MANAGER", "MATCHING_MANAGER", "RELATIONSHIP_MANAGER"]), (req, res) => profileController.logAccess(req, res));
 
+// Profile deletion — OWNER only
+router.delete("/:profileId", requireRole(["OWNER"]), (req, res) => profileController.deleteProfile(req, res));
+
 export { router as profileRoutes };

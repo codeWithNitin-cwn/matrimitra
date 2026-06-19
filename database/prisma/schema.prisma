@@ -248,6 +248,9 @@ model Proposal {
   brideProfileId   String
   groomProfileId   String
   proposalStatus   String
+  brideAccepted    Boolean            @default(false)
+  groomAccepted    Boolean            @default(false)
+  matchType        String             @default("CROSS_AGENCY")
   proposalNotes    String?
   createdBy        String
   createdAt        DateTime           @default(now())

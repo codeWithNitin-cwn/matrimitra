@@ -240,12 +240,6 @@ export default function MatchesListView() {
                             </div>
                             
                             <div className="flex flex-col items-end gap-y-1">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-800">
-                                Filter Match: {match.filterScore}%
-                              </span>
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-indigo-50 text-indigo-700">
-                                AI Compatibility: {match.compatibilityScore}%
-                              </span>
                               <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
                                 match.finalScore >= 90 ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
                                 match.finalScore >= 80 ? 'bg-green-100 text-green-800' :
@@ -343,12 +337,6 @@ export default function MatchesListView() {
                             </div>
                             
                             <div className="flex flex-col items-end gap-y-1">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-800">
-                                Filter Match: {match.filterScore}%
-                              </span>
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-indigo-50 text-indigo-700">
-                                AI Compatibility: {match.compatibilityScore}%
-                              </span>
                               <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
                                 match.finalScore >= 90 ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' :
                                 match.finalScore >= 80 ? 'bg-green-100 text-green-800' :

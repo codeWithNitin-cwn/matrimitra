@@ -24,6 +24,13 @@ export class ClientRepository {
       where: { id, agencyId },
       include: {
         assignedUser: true,
+        agency: {
+          include: {
+            users: {
+              where: { role: "OWNER" }
+            }
+          }
+        },
         profiles: true,
         notes: {
           include: { author: true },

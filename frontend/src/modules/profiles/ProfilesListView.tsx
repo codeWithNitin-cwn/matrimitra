@@ -3,8 +3,9 @@
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import { PlusIcon, EyeIcon, PencilSquareIcon, TrashIcon } from "@heroicons/react/24/outline";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ProfileService } from "./profile.service";
+import { useAuthStore } from "@/modules/auth/auth.store";
 
 function calculateCompletion(profile: any) {
   if (profile.status === 'APPROVED') return 100;
@@ -66,10 +67,34 @@ function getStatusBadge(status: string, completion: number) {
 }
 
 export default function ProfilesListView() {
+  const queryClient = useQueryClient();
+  const user = useAuthStore((state) => state.user);
+  const isOwner = user?.role === "OWNER";
+
+  const [profileToDelete, setProfileToDelete] = useState<any>(null);
+
   const { data: profiles, isLoading, isError, error } = useQuery({
     queryKey: ["profiles"],
     queryFn: ProfileService.getProfiles,
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: ProfileService.deleteProfile,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profiles"] });
+      setProfileToDelete(null);
+    },
+    onError: (error: any) => {
+      alert(error.response?.data?.error?.message || "Failed to delete profile");
+      setProfileToDelete(null);
+    }
+  });
+
+  const handleConfirmDelete = () => {
+    if (profileToDelete) {
+      deleteMutation.mutate(profileToDelete.id);
+    }
+  };
 
   const [searchTerm, setSearchTerm] = useState("");
   const [genderFilter, setGenderFilter] = useState("");
@@ -206,6 +231,15 @@ export default function ProfilesListView() {
                           >
                             <PencilSquareIcon className="h-5 w-5" />
                           </Link>
+                          {isOwner && profile.status === "DRAFT" && (
+                            <button
+                              onClick={() => setProfileToDelete(profile)}
+                              className="text-gray-400 hover:text-red-600"
+                              aria-label="Delete profile"
+                            >
+                              <TrashIcon className="h-5 w-5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -224,6 +258,33 @@ export default function ProfilesListView() {
           </table>
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {profileToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Profile</h3>
+            <p className="text-sm text-gray-500 mb-6">
+              Are you sure you want to delete profile <strong>{profileToDelete.profileNumber || profileToDelete.id}</strong>? This action cannot be undone and will delete all associated data.
+            </p>
+            <div className="flex justify-end gap-x-3">
+              <button
+                onClick={() => setProfileToDelete(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={deleteMutation.isPending}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-650 hover:bg-red-700 rounded-md disabled:bg-red-300"
+              >
+                {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

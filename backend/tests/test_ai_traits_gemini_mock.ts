@@ -1,7 +1,4 @@
-import { prisma } from "../src/config/prisma.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { generateAITraits } from "../src/integrations/gemini.js";
-import { TraitService } from "../src/modules/match/trait.service.js";
 
 // Mock GoogleGenerativeAI prototype before anything runs
 GoogleGenerativeAI.prototype.getGenerativeModel = function(options: any) {
@@ -43,11 +40,16 @@ async function main() {
   // Set a dummy API key so gemini.ts doesn't bypass Gemini
   process.env.GEMINI_API_KEY = "mock_api_key_for_testing";
 
+  // Dynamic imports to prevent hoisted imports from evaluating before env var is set
+  const { prisma } = await import("../src/config/prisma.js");
+  const { generateAITraits } = await import("../src/integrations/gemini.js");
+  const { TraitService } = await import("../src/modules/match/trait.service.js");
+
   const traitService = new TraitService();
 
   // 1. Fetch an approved profile
-  const profile = await prisma.agencyProfile.findFirst({
-    where: { status: "APPROVED" },
+  const profiles = await prisma.agencyProfile.findMany({
+    where: { status: "ACTIVE" },
     include: {
       person: true,
       answers: {
@@ -59,8 +61,10 @@ async function main() {
     }
   });
 
+  const profile = profiles.find(p => p.answers.length >= 40);
+
   if (!profile) {
-    console.error("❌ No approved profiles found in database to verify.");
+    console.error("❌ No active profiles with sufficient answers (>= 40) found in database.");
     return;
   }
 
@@ -119,5 +123,4 @@ async function main() {
 }
 
 main()
-  .catch(console.error)
-  .finally(() => prisma.$disconnect());
+  .catch(console.error);

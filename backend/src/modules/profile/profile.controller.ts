@@ -37,13 +37,14 @@ export class ProfileController {
         res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid profile ID format" } });
         return;
       }
+      const viewerProfileId = req.query.viewerProfileId as string | undefined;
       const agencyId = (req as any).user?.agencyId;
       const userId = (req as any).user?.id;
       if (!agencyId || !userId) {
         res.status(401).json({ success: false, error: { code: "UNAUTHORIZED", message: "Unauthorized agency access" } });
         return;
       }
-      const profile = await this.profileService.getProfileById(profileId, agencyId, userId);
+      const profile = await this.profileService.getProfileById(profileId, agencyId, userId, viewerProfileId);
       res.status(200).json({ success: true, data: profile });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to fetch profile";
@@ -633,6 +634,41 @@ export class ProfileController {
         success: false,
         error: { code: "INTERNAL_SERVER_ERROR", message }
       });
+    }
+  }
+
+  async deleteProfile(req: Request, res: Response): Promise<void> {
+    try {
+      const { profileId } = req.params;
+      if (typeof profileId !== "string") {
+        res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Invalid profile ID format" } });
+        return;
+      }
+
+      const agencyId = (req as any).user?.agencyId;
+      const userRole = (req as any).user?.role;
+      if (!agencyId || !userRole) {
+        res.status(401).json({ success: false, error: { code: "UNAUTHORIZED", message: "Unauthorized agency access" } });
+        return;
+      }
+
+      await this.profileService.deleteProfile(profileId, agencyId, userRole);
+      res.status(200).json({ success: true, message: "Profile deleted successfully" });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to delete profile";
+      if (message.includes("Unauthorized")) {
+        res.status(403).json({ success: false, error: { code: "FORBIDDEN", message } });
+        return;
+      }
+      if (message.includes("Invalid profile status")) {
+        res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message } });
+        return;
+      }
+      if (message.includes("Profile not found")) {
+        res.status(404).json({ success: false, error: { code: "NOT_FOUND", message } });
+        return;
+      }
+      res.status(500).json({ success: false, error: { code: "INTERNAL_SERVER_ERROR", message } });
     }
   }
 }

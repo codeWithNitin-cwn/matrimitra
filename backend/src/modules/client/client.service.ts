@@ -25,6 +25,10 @@ export class ClientService {
   async getClientById(clientId: string, agencyId: string, userId: string) {
     const client = await this.verifyClientOwnership(clientId, agencyId);
     
+    if (!client.assignedUser && (client as any).agency?.users?.length > 0) {
+      client.assignedUser = (client as any).agency.users[0];
+    }
+    
     await prisma.auditLog.create({
       data: {
         agencyId,
@@ -52,7 +56,7 @@ export class ClientService {
       mobile: data.mobile,
       status: data.status || "LEAD",
       leadSource: data.leadSource || null,
-      assignedUserId: data.assignedUserId || null,
+      assignedUserId: data.assignedUserId || userId,
       nextFollowUpAt: data.nextFollowUpAt ? new Date(data.nextFollowUpAt) : null,
     });
 

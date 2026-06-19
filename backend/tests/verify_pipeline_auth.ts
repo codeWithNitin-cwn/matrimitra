@@ -69,6 +69,8 @@ async function run() {
         brideProfileId: bride.id,
         groomProfileId: groom.id,
         proposalStatus: "ACCEPTED",
+        brideAccepted: true,
+        groomAccepted: true,
         createdBy: "SYSTEM"
       }
     });

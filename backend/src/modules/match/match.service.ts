@@ -315,9 +315,35 @@ export class MatchService {
     const totalQuestions = await prisma.question.count({ where: { isActive: true } }) || 1;
 
     for (const candidate of candidates) {
+      // Validate profile completeness and check for N/A values
+      const firstName = candidate.person?.firstName;
+      const gender = candidate.person?.gender;
+      const dob = candidate.person?.dob;
+      const city = candidate.personal?.city;
+      const hasPreferences = candidate.preferences && candidate.preferences.length > 0;
+
+      const isInvalidValue = (val: any) => {
+        if (val === null || val === undefined) return true;
+        if (typeof val === 'string') {
+          const clean = val.trim().toLowerCase();
+          return clean === '' || clean === 'n/a' || clean === 'na';
+        }
+        return false;
+      };
+
+      if (
+        isInvalidValue(firstName) ||
+        isInvalidValue(gender) ||
+        !dob ||
+        isInvalidValue(city) ||
+        !hasPreferences
+      ) {
+        continue; // skip incomplete / invalid profiles
+      }
+
       const candidatePref = candidate.preferences[0];
       const candidateAttributes = {
-        age: calculateAge(candidate.person.dob),
+        age: calculateAge(dob),
         height: candidate.personal?.heightCm || null,
         religion: candidate.personal?.religion || null,
         caste: candidate.personal?.caste || null,
@@ -337,6 +363,7 @@ export class MatchService {
       // Check Questionnaire MUST_HAVE deal breakers
       let dealBreakerViolated = false;
       let rejectedReason = "";
+      let questionnairePenalty = 0;
       for (const targetAns of targetAnswers) {
         if (targetAns.importance === "MUST_HAVE") {
           const qText = targetAns.question?.questionText?.toLowerCase() || "";
@@ -355,6 +382,7 @@ export class MatchService {
             const candAns = candidate.answers.find(a => a.questionId === targetAns.questionId);
             if (!candAns || candAns.selectedOptionId !== targetAns.selectedOptionId) {
               dealBreakerViolated = true;
+              questionnairePenalty += 15; // Mismatch of a questionnaire MUST_HAVE adds -15 score penalty
               let conflictType = "Questionnaire conflict";
               if (isSmokingDB) conflictType = "Smoking conflict";
               else if (isDrinkingDB) conflictType = "Drinking conflict";
@@ -362,15 +390,13 @@ export class MatchService {
               else if (isFamilySetupDB) conflictType = "Family setup conflict";
               else if (isRelocationDB) conflictType = "Relocation conflict";
               rejectedReason = `${conflictType} (MUST_HAVE)`;
-              break;
             }
           }
         }
       }
 
       if (dealBreakerViolated) {
-        console.log(`[Deal Breaker] Candidate ${candidate.profileNumber} rejected for Source ${targetProfile.profileNumber}: Rejected: ${rejectedReason}`);
-        continue; // REJECT candidate
+        console.log(`[Deal Breaker] Candidate ${candidate.profileNumber} has deal-breaker mismatch for Source ${targetProfile.profileNumber}: Mismatch: ${rejectedReason}`);
       }
 
       // ==========================================
@@ -381,6 +407,7 @@ export class MatchService {
         let currentMaxPrefScore = 0;
         let currentDisqualified = false;
         let disqualificationReason = "";
+        let disqualifiedMustHavesCount = 0;
 
         const evaluatePref = (priority: string, isMatch: boolean, hasPref: boolean, fieldName: string) => {
           if (!hasPref || priority === "DOESNT_MATTER") return;
@@ -392,6 +419,7 @@ export class MatchService {
             } else {
               currentDisqualified = true;
               disqualificationReason = `${fieldName} conflict (MUST_HAVE)`;
+              disqualifiedMustHavesCount++;
             }
           } else if (priority === "IMPORTANT") {
             currentMaxPrefScore += 25;
@@ -464,7 +492,8 @@ export class MatchService {
           score: currentPrefScore,
           maxScore: currentMaxPrefScore,
           disqualified: currentDisqualified,
-          reason: disqualificationReason
+          reason: disqualificationReason,
+          disqualifiedMustHavesCount
         };
       };
 
@@ -474,14 +503,12 @@ export class MatchService {
       // 2. Target -> Source
       const targetToSourceRes = calculateDirectionalPrefScore(candidatePref, targetAttributes);
 
-      // If either violates a MUST_HAVE, disqualify candidate
+      // Log MUST_HAVE violations but do not reject the candidate before scoring
       if (sourceToTargetRes.disqualified) {
-        console.log(`[Deal Breaker] Candidate ${candidate.profileNumber} rejected for Source ${targetProfile.profileNumber}: Rejected: ${sourceToTargetRes.reason} (Source -> Target preference conflict)`);
-        continue;
+        console.log(`[Deal Breaker] Candidate ${candidate.profileNumber} has preference conflict for Source ${targetProfile.profileNumber}: Mismatch: ${sourceToTargetRes.reason} (Source -> Target)`);
       }
       if (targetToSourceRes.disqualified) {
-        console.log(`[Deal Breaker] Candidate ${candidate.profileNumber} rejected for Source ${targetProfile.profileNumber}: Rejected: ${targetToSourceRes.reason} (Target -> Source preference conflict)`);
-        continue;
+        console.log(`[Deal Breaker] Candidate ${candidate.profileNumber} has preference conflict for Source ${targetProfile.profileNumber}: Mismatch: ${targetToSourceRes.reason} (Target -> Source)`);
       }
 
       // Mutual preference score calculation (average of both directions)
@@ -532,19 +559,22 @@ export class MatchService {
       const rawEduCareer = calculateEducationCareerScore(targetProfile, candidate);
       const educationCareerScorePercent = rawEduCareer !== null ? Math.max(0, Math.min(100, rawEduCareer)) : null;
       
+      const prefMustHavePenalty = 20 * (sourceToTargetRes.disqualifiedMustHavesCount + targetToSourceRes.disqualifiedMustHavesCount);
+      const totalPenalty = questionnairePenalty + prefMustHavePenalty;
+
       let finalScore = 0;
       if (educationCareerScorePercent === null) {
         // Normalize: distribute 10% weight of missing Education/Career score across remaining components
         const rawFinalScore = Math.round(
           (weightedFilterScore + weightedQuestScore + weightedLifestyleScore) / 0.9
         );
-        finalScore = Math.max(0, Math.min(95, rawFinalScore));
+        finalScore = Math.max(0, Math.min(95, rawFinalScore - totalPenalty));
       } else {
         const weightedEduCareerScore = educationCareerScorePercent * 0.1;
         const rawFinalScore = Math.round(
           weightedFilterScore + weightedQuestScore + weightedLifestyleScore + weightedEduCareerScore
         );
-        finalScore = Math.max(0, Math.min(95, rawFinalScore));
+        finalScore = Math.max(0, Math.min(95, rawFinalScore - totalPenalty));
       }
 
       // Strengths & Concerns Explanation Generation from Traits (Deterministic first)
@@ -643,23 +673,19 @@ export class MatchService {
       const isAccepted = await prisma.proposal.findFirst({
         where: {
           proposalStatus: "ACCEPTED",
+          brideAccepted: true,
+          groomAccepted: true,
           OR: [
-            { brideProfileId: candidate.id },
-            { groomProfileId: candidate.id }
-          ],
-          AND: {
-            OR: [
-              { senderAgencyId: targetProfile.agencyId },
-              { receiverAgencyId: targetProfile.agencyId }
-            ]
-          }
+            { brideProfileId: targetProfile.id, groomProfileId: candidate.id },
+            { brideProfileId: candidate.id, groomProfileId: targetProfile.id }
+          ]
         }
       });
       const showFullDetails = isOwnAgency || !!isAccepted;
 
       rankedMatches.push({
         candidateId: candidate.id,
-        personName: showFullDetails ? `${candidate.person.firstName} ${candidate.person.lastName || ''}`.trim() : "Partner Client",
+        personName: `${candidate.person.firstName} ${candidate.person.lastName || ''}`.trim(),
         isOwnAgency,
         showFullDetails,
         filterScore: Math.round(filterScorePercent),
@@ -696,7 +722,17 @@ export class MatchService {
       return bRankScore - aRankScore;
     });
 
-    return rankedMatches.slice(0, 50);
+    // Deduplicate matches by candidateId
+    const uniqueMatches: typeof rankedMatches = [];
+    const seenCandidateIds = new Set<string>();
+    for (const match of rankedMatches) {
+      if (!seenCandidateIds.has(match.candidateId)) {
+        seenCandidateIds.add(match.candidateId);
+        uniqueMatches.push(match);
+      }
+    }
+
+    return uniqueMatches.slice(0, 50);
   }
 
   async getProposalRecommendation(profileId: string, candidateId: string) {

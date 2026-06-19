@@ -7,8 +7,8 @@ async function main() {
   const traitService = new TraitService();
 
   // 1. Fetch an approved profile
-  const profile = await prisma.agencyProfile.findFirst({
-    where: { status: "APPROVED" },
+  const profiles = await prisma.agencyProfile.findMany({
+    where: { status: "ACTIVE" },
     include: {
       person: true,
       answers: {
@@ -20,8 +20,10 @@ async function main() {
     }
   });
 
+  const profile = profiles.find(p => p.answers.length >= 40);
+
   if (!profile) {
-    console.error("❌ No approved profiles found in database to verify.");
+    console.error("❌ No active profiles with sufficient answers (>= 40) found in database.");
     return;
   }
 
